@@ -1,16 +1,14 @@
 This material was downloaded from BIX (Byte Information eXchange).  Below
 is a copy of the information from the BIX listings area.
 
--Fred  ><>
- 24-Jan-91
+-Fred ><>
+ 6-Mar-91
 
 ------------------------------------------------
-post14.lzh     243712  Approx time (min):251 at 300 baud, 63 at 1200 baud
-Contributed by: radical.eye  Date: Wed Jan 23 19:59:22 1991
-PostScript interpreter for the Amiga by Adrian Aylward.
-Excellent implementation of PostScript; supports type 1
-and type 3 fonts, supports screen, file, and printer output,
-a major achievement.
-Keywords: $binary
-Home area: radical.eye  Download count: 9
+post15.lzh     247808  Approx time: 0:32 at 2400 baud, 1:04 at 1200 baud
+Contributed by: radical.eye  Date: Sat Mar  2 20:30:10 1991
+Latest Post PostScript interpreter for the Amiga by Adrian Aylward.
+Better Type I font rendering; some bugs fixed.
+Keywords: $binary fonts graphics interpret postscript print typesetting
+Home area: radical.eye  Download count: 47
 ------------------------------------------------

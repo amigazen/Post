@@ -17,7 +17,8 @@
 
 /* The version number */
 
-# define POSTVER "Post V1.4"
+# define POSTVER   "Post V1.5"
+# define POSTVERNO 15
 
 /* Default and minimum memory sizes */
 

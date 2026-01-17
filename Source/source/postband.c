@@ -1,4 +1,4 @@
-/* Band rendering print driver for Post V1.4.  File "postband.c"
+/* Band rendering print driver for Post V1.5.  File "postband.c"
  * (C) Adrian Aylward 1989, 1991
  *
  * You may freely copy, use, and modify this file.
@@ -173,7 +173,7 @@ void main(int argc, char **argv)
 
     /* Open the libraries */
 
-    PSbase = OpenLibrary("post.library", 0);
+    PSbase = OpenLibrary("post.library", POSTVERNO);
     if (PSbase == NULL)
     {   errmsg("can't open post.library");
         goto errorexit;
@@ -681,14 +681,19 @@ void printpage()
     prreq.io_SrcY = 0;
     prreq.io_SrcWidth = parm.page.xsize;
     prreq.io_SrcHeight = parm.page.ysize;
-    prreq.io_DestCols = parm.page.xsize;
-    prreq.io_DestRows = parm.page.ysize;
     prreq.io_Special = (SPECIAL_DENSITY1 * prden) | SPECIAL_TRUSTME;
     if (ybase + parm.page.ysize >= parm.page.yheight)
-        prreq.io_SrcHeight = prreq.io_DestRows =
-                parm.page.yheight - ybase;
+        prreq.io_SrcHeight = parm.page.yheight - ybase;
     else
         prreq.io_Special |= SPECIAL_NOFORMFEED;
+    if (prextdata->ped_MaxXDots != 0)
+        if (prreq.io_SrcWidth > prextdata->ped_MaxXDots)
+            prreq.io_SrcWidth = prextdata->ped_MaxXDots;
+    if (prextdata->ped_MaxYDots != 0)
+        if (prreq.io_SrcHeight > prextdata->ped_MaxYDots)
+            prreq.io_SrcHeight = prextdata->ped_MaxYDots;
+    prreq.io_DestCols = prreq.io_SrcWidth;
+    prreq.io_DestRows = prreq.io_SrcHeight;
     ybase += prreq.io_SrcHeight;
     prflags = prprefs->PrintFlags;
     prprefs->PrintFlags = prflags & ~DIMENSIONS_MASK | IGNORE_DIMENSIONS;

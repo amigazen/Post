@@ -1,4 +1,4 @@
-/* LaserJet print driver for Post V1.4.  File "postlj.c"
+/* LaserJet print driver for Post V1.5.  File "postlj.c"
  * (C) Adrian Aylward 1990, 1991
  *
  * You may freely copy, use, and modify this file.
@@ -186,7 +186,7 @@ void main(int argc, char **argv)
 
     /* Open the libraries */
 
-    PSbase = OpenLibrary("post.library", 0);
+    PSbase = OpenLibrary("post.library", POSTVERNO);
     if (PSbase == NULL)
     {   fprintf(stderr, "postlj: can't open post.library\n");
         goto errorexit;

@@ -49,7 +49,7 @@ postlj:       postlj.o postasm.o
 
 post.library:	postlib.o $(LIBOBJ)
 	blink from postlib.o $(LIBOBJ) to post.library lib $(LIBFPT) lib:lc.lib smalldata nodebug
-	protect post.library -e
+	protect post.library rwd
 
 # Statically linked version for debugging
 

@@ -1,4 +1,4 @@
-PostScript shared library interface (post.library, with Post V1.3)
+PostScript shared library interface (post.library, with Post V1.5)
 ==================================================================
 
 Copyright Adrian Aylward 1991.
@@ -289,6 +289,5 @@ or imaging procedure.
 Versions
 ========
 
-The version of the library distributed with Post V1.4 has version number 1,
-revision 4.
+The version of the library distributed with Post V1.5 has version number 15.
 

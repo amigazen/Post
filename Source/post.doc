@@ -1,7 +1,7 @@
 Postscript interpreter - user documentation
 ===========================================
 
-Post V1.4 Copyright Adrian Aylward 1989, 1991
+Post V1.5 Copyright Adrian Aylward 1989, 1991
 
 Free use and non-commercial reproduction of the binaries of the interpreter
 library (post.library) is permitted, providing that the copyright notices
@@ -656,7 +656,7 @@ width, font character cache sizing, tune baseline alignment and flex,
 eexec lines ending in CR (not CRLF), aload packed arrays, zero length
 charstrings, font character cache hash chains.
 
-    V1.4  ??-???-??
+    V1.4  22-Jan-91
 
 External function call interface added.  New flexible memory allocation for
 vm and paths; new error "memoryallocation".  More flexible font cache limit.
@@ -666,3 +666,15 @@ under 2.0.
 
 Bugs fixed: writehexstring, zero height clipped paths, $error in userdict,
 undocumented charstring codes, halftone cacheing, mixed type 1 and 3 fonts.
+
+    V1.5  01-Mar-91
+
+Type 1 font character rendering improved (though slower).
+
+Fix printer page size selection (inches).  Printer output now truncates to
+maximum dump size, to prevent scaling.
+
+Bugs fixed: path fill at top of clip path, free first vm segment, rotate
+scale and translate with matrix operands, cached characters within clip path,
+long clip paths, clippath not default clip path, hollow clip paths, setband.
+
