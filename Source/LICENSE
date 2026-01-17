@@ -1,0 +1,87 @@
+Postscript interpreter - LICENCE
+================================
+
+Post V1.7 Copyright Adrian Aylward 1989, 1992
+
+This distribution was released as the archive files "post17b.lzh" (binaries)
+and "post17s.lzh" (sources), 10-Mar-92
+
+Source files released in this distribution:
+
+LICENCE           This file
+
+User interface sources:
+
+post.c            User interface, C main program
+postband.c        Band printing driver, C main program
+postlj.c          LaserJet printing driver, C main program
+postasm.a         User interface, assembler support
+postlib.doc       Library interface documentation file
+postlib.h         Library interface header
+makefile          Make file
+
+Interpreter library sources:
+
+postlib.a         Library interface assembler code
+postprog.doc      Programmer documentation file
+post.h            Interpreter header
+postdata.c        Interpreter data
+postinit.c        Interpreter initialisation
+postint.c         Interpreter main loop
+postop1.c         Interpreter operators (1)
+postop2.c         Interpreter operators (2)
+postop3.c         Interpreter operators (3)
+postop4.c         Interpreter operators (4)
+postshade.c       Interpreter shades and halftones
+postgraph.c       Interpreter graphics routines
+postdraw.c        Interpreter drawing routines
+postchar.c        Interpreter character show routines
+postfont.c        Interpreter type 1 font routines
+
+The binaries were built using Lattice (now SAS) C version 5.05.  More recent
+versions will probably work, but earlier versions of the compiler had bugs
+that may cause problems.
+
+License terms
+=============
+
+You may freely copy, distribute, and modify these sources.  You may compile,
+and run them on any AmigaDOS based computer, and freely distribute the
+resulting binaries.
+
+You may not sell either the interpreter library sources or binaries for
+profit, other than a disk copying and handling charge.  You may however
+include the library within the distribution of a commercial program that
+uses it. You may also upload these files to a commercial bulletin board
+that charges for connect time, as long as there is no specific charge for
+the files.
+
+If you wish to incorporate any part of the interpreter library sources
+within a commercial program, or to port the interpreter to another operating
+system, you should contact the author to discuss licensing terms.
+
+If you modify the sources the following restrictions apply:
+
+  1) You may not remove the author's copyright notices.
+
+  2) If you change any file you must add a header notice to it outlining
+     the changes.
+
+  3) If you release modified versions of the binaries you must change the
+     version number to one distinct from the format (V#.# - where "#" is
+     any digit) used by the author.  If you change the library you must
+     change its version or revision number and ID string.
+
+For queries and bug reports write to the author:
+
+        Adrian Aylward,
+        20 Maidstone Road,
+        SWINDON,
+        Wiltshire.
+        UK.
+
+No responsibilities accepted for bugs, but please let me know so I can fix
+them.  There is no charge for distributing post.library with commercial
+programs, but if you should come up with an interesting application for it
+then do feel free to send me a copy.
+

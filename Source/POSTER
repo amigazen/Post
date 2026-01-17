@@ -1,14 +1,23 @@
-This material was downloaded from BIX (Byte Information eXchange).  Below
-is a copy of the information from the BIX listings area.
+This material was downloaded from BIX (Byte Information eXchange).  Below is
+a copy of the information from the BIX Amiga listings area.
 
--Fred ><>
- 6-Mar-91
+-Fred  ><>
+ 20-May-92
 
 ------------------------------------------------
-post15.lzh     247808  Approx time: 0:32 at 2400 baud, 1:04 at 1200 baud
-Contributed by: radical.eye  Date: Sat Mar  2 20:30:10 1991
-Latest Post PostScript interpreter for the Amiga by Adrian Aylward.
-Better Type I font rendering; some bugs fixed.
-Keywords: $binary fonts graphics interpret postscript print typesetting
-Home area: radical.eye  Download count: 47
+post17s.lzh    173056  Approx time: 0:22 at 2400 baud, 0:45 at 1200 baud
+Contributed by: radical.eye  Date: Wed Apr  8 04:05:01 1992
+Post is a PostScript interpreter for the Amiga.  This is the source
+distribution.  Written by Adrian Aylward, it is a must-have.  Now
+any printer can be a PostScript printer!
+Keywords: $binary fonts postscript printing typesetting
+Home area: radical.eye  Download count: 74
+------------------------------------------------
+post17b.lzh    210944  Approx time: 0:27 at 2400 baud, 0:54 at 1200 baud
+Contributed by: radical.eye  Date: Wed Apr  8 04:04:54 1992
+Post is a PostScript interpreter for the Amiga.  This is the binary
+distribution.  Written by Adrian Aylward, it is a must-have.  Now
+any printer can be a PostScript printer!
+Keywords: $binary fonts postscript printing typesetting
+Home area: radical.eye  Download count: 9
 ------------------------------------------------

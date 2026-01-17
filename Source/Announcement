@@ -1,0 +1,98 @@
+Short: Postscript preview/printing utility.
+
+TITLE
+
+	Post Enhanced
+
+VERSION
+
+	Version 1.86enh
+
+AUTHOR
+
+	Version 1.86enh enhancements, Robert Poole
+	Original code Copyright 1989, 1992 Adrian Aylward
+
+DESCRIPTION
+
+	Post 1.7 is a great PostScript viewer, and my enhancements fix some
+	of its more glaring bugs and add functionality.
+
+	Post V1.86enh allows the user to view PostScript documents on screen,
+	send them to ANY preferences supported printer (contrary to claims
+	made in the recent announcement of GhostScript for the Amiga), or
+	create an IFF-ILBM file from the PostScript file.  There are also
+	separate programs in the distribution (unchanged from Mr. Aylward's
+	distribution of version 1.7) which allow printing to the HP LaserJet
+	and compatibles (faster than printing through preferences) and which
+	allow band printing for printers with limited memory.
+
+NEW FEATURES
+
+	* All Amigados 1.3 compatibility has been removed to facilitate a
+	  better, more consistent user interface.  Post now uses GadTools
+	  menus and GadTools.library generated gadgets.
+
+	* Full-color fully 3-D windows.  Post now uses a 16-color hires
+	  screen for all its rendering regardless of the rendering mode
+	  selected (B&W, RGB, CMYK) for document output.
+
+	* Full support for and use of ASL file requesters.
+
+	* Many bugs removed.  Most notably, resizing windows will not destroy
+	  their graphical contents.
+
+	* Post now offers compatibility with SunMouse and AutoPoint
+	  commodities with a simple checkbox gadget.
+
+SPECIAL REQUIREMENTS
+
+	Post V1.86enh requires Amigados 2.04 or greater.  Hard disk and
+	lots of RAM are highly recommended.
+
+HOST NAME
+
+	amiga.physik.unizh.ch (130.60.80.80)
+	(and all mirrors)
+
+DIRECTORY
+
+	amiga/new
+
+	Soon: amiga/text/print (or another logical location, check the SHORT
+	or RECENT file list in the amiga directory)
+
+	Note: mirrors of amiga.physik use "aminet" rather than "amiga" for
+	the path.
+
+FILE NAMES
+
+	Post186enh_bin.lha
+		full distribution (except source code), contains all
+		fonts from the GNU GhostScript distribution (which are
+		themselves PD or covered by GNU Copyleft)
+	Post186enh_min.lha
+		All binaries, but only one font -- Funkyfont, which came
+		with Post 1.7.  This file is all you'll need if you already
+		have a set of Adobe type 1 or type 3 fonts.
+	Post186enh_src.lha
+		Source code for all the binaries.  Every effort has been made
+		to make these files compliant with SAS/C 6.x format.
+
+PRICE
+
+	Absolutely free.
+
+DISTRIBUTABILITY
+
+	Adrian Aylward's licence (included in the source distribution) allows
+	for very liberal redistribution of the source and binaries, plus
+	modified source and modified binaries (providing that the version
+	numbering system is significantly different from his).  So, copy at
+	will, do what thou wilt.
+
+OTHER
+
+	Questions, comments, flames: Send them to me, Robert Poole
+	pooler@rpi.edu
+	pooler@cs.rpi.edu

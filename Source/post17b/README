@@ -1,0 +1,384 @@
+Postscript interpreter - README
+===============================
+
+Post V1.7 Copyright Adrian Aylward 1989, 1992
+
+This distribution was released as the archive files "post17b.lzh" (binaries)
+and "post17s.lzh" (sources), 12-Mar-92
+
+Binary files released in this distribution:
+
+README            This file
+Post.info         Icon file
+post              User interface
+post.doc          Documentation file
+postband          Band printing driver
+postband.doc      Documentation file
+postlj            LaserJet printing driver
+postlj.doc        Documentation file
+post.library      Shared library for Amiga 500/1000/2000
+post.library.2620 Shared library for Amiga 2500/3000 (68020/030, 68881/2)
+init.ps           Standard postscript startup file
+
+Font files:
+
+FunkyFont         Tiny font, courtesy of Radical Eye software
+FunkyFont.afm     Metric file for the above
+
+You will also need:
+
+arp.library       Arp library, V39+
+conman            ConMan, V1.3+ (if you have Workbench 1.3)
+
+You should find these on "All Good BBS's/disk libraries"
+
+You will need at least a megabyte of memory.  Even with a megabyte you
+will have not be able to generate a full page in colour on the screen.
+For high density printer output (A4 at 300 dpi.) you will need 2 megabytes!  If memory is very tight, try running from the CLI, before workbench has
+been loaded.
+
+Examples
+========
+
+There are some PostScript examples and demo programs that are being
+distributed separately, as they do not change from release to release.
+Look out for the file "psdemos1.lzh".
+
+The PostScript Language
+=======================
+
+If you don't know any PostScript I recomend obtaining a suitable tutorial
+book.  Try the "blue book" from Adobe:
+
+    "PostScript Language Tutorial and Cookbook"
+    Adobe Systems Incorporated,
+    Addison-Wesley 1985, ISBN 0-201-10179-3
+
+If you want to learn PostScript, Post is a valuable learning tool, as you
+run it interactively and view the output one the screen.  Without some basic
+knowledge you may find it difficult to understand what is happening if you
+have problems getting started.
+
+Installation
+============
+
+Make sure you have installed arp.library in your libs: directory.  You should
+also have ConMan installed if you are running under Workbench 1.3.  These
+packages are both freely available.  If you don't have them already any
+decent BBS or public domain disk library should have them.
+
+Before using Post you will need to copy the library into your libs:
+directory.  If you have an Amiga A3000, or an accelerator card with a 32 bit
+cpu (68020/030/040) and a floating point unit (68881/68882 or 68040) you can
+use the 2620 version of the library instead.  This is compiled to use
+hardware floating point instructions and runs about twice as fast.
+Otherwise you must use the standard library - if you try the 2620 version
+it will refuse to open.  If you have an earlier version of Post installed
+be sure to update the library.
+
+To use FunkyFont, set up a directory "PSFonts:" and copy FunkyFont into it.
+Make a directory "PSFonts:afms" and then copy FunkyFont.afm into it.  (This
+file is not actually used by Post, but may be needed by other applications
+using FunkyFont).  If you want to make FunkyFont your default font, then edit
+the file "init.ps".  You need to comment out the line near the end that
+defines Courier as the default and uncomment the one that defines FunkyFont
+instead.  (In a PostScript source file a percent symbol ("%") means that
+the rest of the line is a comment.)  FunkyFont was written by Tomas Rokicki
+of Radical Eye Software; it is included by kind permission and is freely
+distributable.
+
+If you have any other PostScript fonts copy them into "PSFonts:" too.  (Do
+not confuse these with Amiga bitmapped fonts - these will NOT work, nor will
+.afm font metric files)  Their names should be the same as their PostScript
+names - e.g. "PSFonts:Times-Roman", "PSFonts:Times-Bold".  The files can
+either be ASCII text or in IBM PostScript font format.  If you have copied
+them from an IBM disk you will have to change the names; since MSDOS can only
+handle 8 character names its stores Times-Roman as "TI______.PFB" and
+Times-Bold as "TIB_____.PFB".  Then Post will load the fonts automatically
+as they are needed.
+
+The startup file
+================
+
+The standard startup file "init.ps" should be run before most programs.  You
+should read it and the comments within it, as you may wish to customise it.
+It defines useful operators to mimic a standard PostScript printer.  It also
+handles automatic font downloading (see below).
+
+Getting started
+===============
+
+Make sure that you have ConMan and the ARP library and you have installed
+Post as described above.
+
+From the CLI you can just type "post init.ps screen", assuming that all the
+files are in the current directory.  You should see a new screen with a big
+requestor window appear.  Click on "OK" and wait while Post executes the
+startup file, then you are ready to go.
+
+If it says that it can't get enough memory (if you have only 1 megabyte)
+try selecting "Black and White" on the requestor window, and selecting
+the "Close WBench" option.
+
+For a quick check of the graphics, pick File/Interactive on the menu.  Then
+type into the narrow window at the top:
+
+    200 200 150 0 360 arc stroke
+
+The result should be a circle appearing in the lower window.
+
+To erase the page type:
+
+    erasepage
+
+If you don't have any fonts yet all text output will just print as big dots.
+To make your text appear properly you need to set up a PSFonts: directory
+as described in the installation section.  To see if your fonts are working
+try:
+
+    /FunkyFont findfont 20 scalefont setfont
+    10 10 moveto (Hello) show
+
+To check your DefaultFont is set up properly try:
+
+    /AnyFontYouDontHave findfont 20 scalefont setfont
+    10 30 moveto (This is the default font) show
+
+When you have finished playing, type "quit".  Then "Project/Quit" will
+return you to the CLI.
+
+To use the workbench startup click on the icon.  You will probably want to
+set up the tooltypes to execute the startup file "init.ps"; for now you can
+enter it in the requestor.
+
+Fonts
+=====
+
+As there are no fonts built in to the interpreter, all fonts must be loaded
+from the disk, as PostScript source.  The standard startup file redefines
+the findfont operator to automatically load fonts from the disk the first
+time they are referenced.  It first searches the directory "PSFonts:" for
+a file whose name is the same as the PostScript name (without the "/").  If
+it finds one it assumes it is a font definition and runs it.  Otherwise it
+tries the directory "PSFonts:OtherFonts".  (On my machine I keep all my Adobe
+fonts in PSFonts: and all my PD fonts in PSFonts:OtherFonts.)  You can change
+the list of directories to be searched by editing the startup file; you can
+also make it add a suffix to the font file names.
+
+The startup file also defines a default font, which will be substituted if
+the font your program requests cannot be found.  The initial default font
+as set up by the standard startup file is a dummy font that just prints big
+dots.  It isn't readable, but at least allows most text operations to proceed
+without producing errors.  This means that if you don't have the font loading
+set up properly the only text output you will get is big dots.  So if that is
+what you see when you run Post it probably means that you don't have any
+fonts, rather than a problem with Post itself.
+
+I have included a freely distributed font called "FunkyFont".  It is simple
+and takes up very little memory, but is quite readable.  If you don't have
+all the standard fonts it makes a useful default font.
+
+Since a font is loaded into the vm just like any other PostScript code, it
+will be discarded when the vm is restored.  This means that in a multiple
+page document the fonts will likely be reloaded on every page.  To save time,
+it is usually much better to preload the fonts you are going to need.  You
+can do this using the "load font" menu command, or you can write yourself
+a little PostScript program to load your favourite fonts.  (Exercise for
+the user: write a driver to extract the font names from a conforming
+PostScript program and preload them.)
+
+There are a number of commercial sources for fonts.  Both the Adobe type 1
+(encrypted) fonts and type 3 (standard downloadable) fonts are supported.
+Since type 1 fonts can contain special "hints" to improve the quality at
+small point sizes on low or medium resolution devices they usually give
+much higher quality results.  You can get type 1 fonts from Adobe, or a
+number of other vendors.
+
+A good source of the standard set of 35 fonts as come on most PostScript
+printers is the Adobe Type Manager (13 fonts) and its associated Plus Pack
+(22 fonts).  The IBM version, for MS Windows, contains the fonts in a format
+which can be read by Post.  Various utility programs (e.g. CROSSDOS) are
+available to copy file from IBM 3.5 inch disks onto Amiga files.  Just copy
+the .PFB files into your PSFonts: directory, changing the names to their
+PostScript names. The Mac version contains the fonts too, but you need a
+utility program to change the file format.  The quality of the Adobe fonts
+is excellent; the printed output from Post on my LJIIP rivals that of a
+LaserWriter.
+
+If you have any of the additional CompuGraphic outline fonts supplied by
+Gold Disk for use with their DTP programs you can generate type 3 fonts
+from them using their conversion program.  The quality is not as good as
+the original Compugraphic fonts but is acceptable for proofing purposes.
+
+There are some freely copyable fonts that were originally distributed with
+the GhostScript project (another freeware PostScript interpreter available
+on Unix).  The quality of these is rather poor, as they appear to have been
+generated by tracing bitmap outlines.  However they will serve to get you
+started, and they are free.
+
+There are also various shareware and PD fonts available.  Many of these were
+derived from the Mac or IBM.  They may still be in a foreign file format.
+The file should be converted to readable ASCII, with no strange control
+characters. Some of the fonts have Mac encoding vectors.  You won't notice
+the difference for the standard ASCII characters, as they are the
+same, but you may have to convert to the standard encoding to get
+more unusual characters like the trademark sign to work.  (Programs
+like Adobe illustrator do their own font encoding anyway.)  You
+will need to know some PostScript to make this change.  If you
+see the sequence "/Helvetica findfont /Encoding get" or
+"<dictionary> /MacVec get" try replacing it with "StandardEncoding".
+
+You are recommended to ensure all your fonts have UniqueID's.  This makes
+the font caching code more efficient.  Often all you have to do is uncomment
+them in the source.  Any number will do for the ID (up to 2**24 - 1), as long
+as it is different for each of your fonts.  Make it a multiple of 4, as Adobe
+recommend adding 1 or 2 to the ID when modifying the font.
+
+Each font should have a FontName entry.  This isn't actually required by
+Adobe, but certain programs such as Adobe Illustrator copy the font directory
+when recoding the font.  If the name is missing, you get a dictionary full
+error after the name has been added.
+
+Common problems
+===============
+
+Printers
+--------
+
+Some people have difficulty in getting Post to work correctly with printer
+output.  The first thing to check is that you have your printer preferences
+set up properly.  Post uses the printer values to set the size and density
+of its page buffer, so if you have silly values set it may pick a silly
+value for its buffer size and fail due to running out of memory.  So Run
+Preferences, go to the graphic 2 screen, and check the page limits.  If you
+set the limits to "Absolute" then width and height should be in inches; if
+you choose "Pixels" then the dimensions are in dots.  Turn smoothing and
+centering off.  On the graphic 1 screen, set the Aspect to horizontal, the
+image to positive, and the shade to black and white or colour according to
+your printer.  If the output comes out distorted, to a silly scale, or with
+circles turned into ellipses, and takes forether to print, it is probably
+because the page size is wrong and the printer device is laboriously scaling
+it to fit.  N.B. the WB 1.3 Preferences program appears to have a bug in it:
+after typing a value into the size gadgets you need to hit the return key;
+if you simply exit with the mouse teh value you typed gets lost.
+
+If you are having problems with the printer setup, it is better to run Post
+interactively.  Then you can look at the values in the page size gadgets
+in the requestor window to check they are all sensible.
+
+Most page printers (lasers, DeskJet) will give the best quality with density
+set to the highest value.  For matrix printers try both the highest and the
+next highest - as the pins usually overlap at high densities the quality may
+not be any better.  If you are very tight on memory then a lower density
+will reduce the amount needed for the page buffer.
+
+The Workbench printer drivers print bitmapped graphics dumps within the
+text margins, whereas PostScript expects it bitmaps to begin right at the
+edges of the paper.  You can line things up properly by setting the page
+offset gadgets in the requestor window.  Once you have experimented to
+determine the proper values to can put them in a shell script, or set them
+in the WorkBench icon, so you don't have to type them every time.
+
+If you have a LaserJet printer or one that emulates it, you should use the
+special driver "postlj".  It is faster, supports all the paper sizes in
+both portrait and landscape orientation, and avoids all the problems with
+the standard Workbench drivers interface.  I have tested it on my HP LJIIP,
+but it should work on other LaserJet compatibles.
+
+If you attempt to print a page that is larger than the maximum graphics dump
+size that the driver will handle, it will be truncated rather than scaled to
+fit.  N.B. the Workbench 1.3 LaserJet and DeskJet drivers do not support
+dumps larger than 8 by 10 inches.
+
+Fonts
+-----
+
+Most of the remaining troubles relate to fonts.  There are many shareware
+fonts about. Normally these work. However being constructed slightly
+differently from the Adobe ones, they sometimes fail when programs attempt
+to modify them to change the character set encoding or character widths or
+obtain special effects. Also they may lack the hints; if so then they will
+not give good quality at small point sizes.
+
+I personally recommend the Adobe fonts: the quality is excellent and you
+are assured of maximum compatability.  Just go and buy yourself a copy of
+Adobe Type manager for Windows.  It is not exactly expensive.
+
+Other troubles with fonts usually relate to not not being able to find the
+font file on the disk.  Read the comments in the init.ps file to see
+what directories in your filing system it is searching, also check whether
+you font files have extensions.  I prefer to keep my fonts without
+extensions, so for example on my machine "Times-Roman" is in the file
+"PSFonts:Times-Roman".  But you may want to keep the ".PFB" extension on
+your font filesif they are in IBM format - if you have other packages that
+like them that way.  You can easily change this by editing init.ps.
+
+N.B. if you have some files with ".AFM" extensions they are NOT PostScript
+fonts.  The are font metric files that define the character widths and other
+data for use by application programs; they do not define the characters
+outlines themselves.  They are of no use to Post.
+
+Use with other packages
+-----------------------
+
+I have used Post extensively with PPage (V2.0).  I find that printing using
+postlj is about five times faster than printing direct from PPage.  It solves
+the page offset problem.  Also, it gives access to the Adobe type 1 font
+range, which is considerably more extensive than the hinted versions of the
+Compugraphic fonts that are presently available.  There is a freely
+distributable package I have written, called "fmdtp", for adding PostScript
+fonts to PPage.
+
+N.B. If you have the Helvetica-Narrow fonts (or if you don't have Helvetica)
+use the alternative prologue (alt_psprlg) so it won't waste time building
+them algorithmically (whether they are needed or not).
+
+I have tested a PageStream file.  There was a problem with the prologue
+not being compatable with downloaded Adobe fonts.  If you load all your
+fonts beforehand, using the "Load font" menu selection, it should work OK.
+Hopefully this has been fixed by now.
+
+I have printed Excellence! files successfully.
+
+AmigaTeX with the PostScript driver also works OK.
+
+Debugging
+---------
+
+If your PostScript program is failing, if you know a little PostScript
+is usually quit easy to find out what is going wrong.  In fact if you are
+developing PostScript code Post is a much better debugging tool than your
+average PostScript printer.
+
+It is normally best to use interactive mode for debugging.  Start up Post
+on the screen and pick the "interactive" option.  Then run you program
+from the interactive window.
+
+To run your program, type:
+
+    > (filename.ps) run
+
+If it fails with an error message, you can then type interactive commands
+to see what happened.
+
+To display the contents of the operand stack, type:
+
+    > pstack
+
+To display the contents of the execution stack at the point of the last
+error, type:
+
+    > $error /estack get ==
+
+To display the contents of any named variable, type:
+
+    > varname ==
+
+To see what is in the current dictionary, type:
+
+    > currentdict {== ==} forall
+
+If you have no idea how far your program got before it failed, try adding a
+few lines "1001 ==" "1002 ==" "1003 ==" to trace how far it got.  As
+PostScript files are pure ASCII text they are easy to inspect any modify
+with any editor.

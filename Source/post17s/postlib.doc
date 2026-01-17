@@ -1,0 +1,300 @@
+PostScript shared library interface (post.library, with Post V1.7)
+==================================================================
+
+Copyright Adrian Aylward 1991, 1992.
+
+Free use and non-commercial reproduction of the binaries of the interpreter
+library (post.library) is permitted, providing that the copyright notices
+are not removed.  Distribution by disk libraries is permitted provided only
+a nominal copying fee is charged.
+
+All other rights are reserved.
+
+Introduction
+============
+
+The file "post.library" is an Exec library containing the PostScript
+interpreter.  It is designed to be shareable between different processes,
+supporting arbitrarily many PostScript activations - at least until you
+run out of memory.
+
+This file should be read in conjunction with the header file "postlib.h".
+
+The standard user interface source files are distributed with Post.  Read
+them as examples.
+
+Activation Records
+==================
+
+Simultaneous multiple activations of PostScript are allowed.  Before using
+post.library you must first open it by a call to OpenLibrary.  To create
+an activation you then call PScreateact which returns a pointer to the
+activation record.  You can then make calls to the interpreter library,
+passing the activation record pointer as an argument.  You can create
+several activations, possibly from different processes and intermingle
+the interpreter calls if you wish.  When you have finished with an
+activation, call PSdeleteact to delete it and free the memory it used.
+When you have finished with the library call CloseLibrary; if no other
+processes have it open, then Exec can remove it from memory if the space
+is needed.  (N.B. if the space is not needed, the library will remain in
+memory in case it is opened again.)
+
+N.B. the library can only be called from a process, as it calls various
+AmigaDOS functions.  It should be possible to pass activation records
+between processes (I think) but I have not tested it.
+
+The Parameter Block
+===================
+
+The parameter block is the argument to PScreateact.  It is specifies the
+addresses of the bitmap planes, size of the page, and the amount of memory
+to be allocated for the activation etc..  Its format is defined in the
+header file.
+
+N.B. all ints are 32 bits, shorts are 16 bits.
+
+The page size is limited to 30000 pixels.  The densities (pixels per inch)
+may be any strictly positive integer value.  The y direction may be set
+to +1 - if the bitmap rows are in PostScript order (bottom row first) or
+-1 - Amiga order (top row first).
+
+    page.buf[24]        Bitplane pointers, up to 24
+    page.len            Size in bytes of each plane
+    page.depth          Number of planes (must be 1,3,4)
+    page.reserved       Reserved, must be zero
+    page.xbytes         Number of bytes in each row
+    page.xsize          Number of pixels in each row
+    page.ysize          Number of rows
+    page.ybase          Base of current band
+    page.yheight        Total height of full page, for band rendering
+    page.xden           X density
+    page.yden           Y density
+    page.ydir           Y direction
+
+As a starting point for memory sizes try the values following.  (These are
+defined in the header file.)  For normal PostScript programs the defaults
+are perfectly satisfactory.  If you specify a value of zero the default
+will be used instead; values less than the minimum will be increased.
+
+    memvlen     50000   VM
+    memflen     60000   Font cache
+    memllen     10000   Path lines
+    memhlen     20000   Halftones
+
+The user data pointer is intended to be used to identify multiple
+activations.  You can set it to any value you like.  The function pointers
+are described below.
+
+    userdata            User data pointer
+    flushfunc           Flush page function pointer
+    copyfunc            Copy page function pointer
+
+The standard input and output streams are the DOS file handles to be used
+by the interpreter for %stdin, %stdout, %stderr.  Also the standard output
+is used for prompts and the error output for error messages.
+
+    infh                Standard Input file handle
+    outfh               Standard Output file handle
+    errfh               Standard Error file handle
+
+    funcmax             Number of external functions
+    functab             Pointer to external function table, or zero
+
+The rest of the block is reserved and must be set to zero.
+
+Function Pointers
+=================
+
+There are two function pointers within the parameter block, which are used
+when the interpreter needs to call routines supplied by its client.  If
+the pointers are zero the calls are skipped.
+
+To help identify calls from multiple activations, the activation record
+address is also passed in a0 and the userdata pointer in a1.
+
+      flushfunc(d0: int y1, d1: int y2)
+
+Flush the bitmap to the screen.  The interpreter calls this function after
+a painting operation has updated the bitmap.  Then if the output is being
+viewed interactively the client can update the screen or window.  The
+arguments are the range of bitmap rows (y1 ... y2-1) that may have been
+updated.
+
+      copyfunc(d0: int num)
+
+Copy the page to the output device.  The argument is the value of #copies,
+which should be taken into account if the output is to a printer, but is
+not meaningful for screen output.
+
+Calling External Functions
+==========================
+
+If you supply an external function table your PostScript program can call
+the functions within it by the "callextfunc" operator.  The contents of the
+table are the addresses of the function entry points.  The functions must
+have standard (Lattice, non-registerised) C compatible calling sequences.
+They must not assume any useful value in register A4 on entry, and must
+preserve A4 and the other C registers on exit.
+
+Only certain PostScript objects may be passed as arguments: integers reals
+and booleans are passed as the 32 bit bitpatterns corresponding to their
+values; arrays and strings are passed as the 32 bit address of their
+contents - if the length is required it must be passed separately.  (N.B.
+PostScript strings are terminated by length; there is no terminating null
+unless the program puts one there.)
+
+It is possible to pass arbitrary objects my including them within an array,
+but then you have to know their PostScript representation.
+
+The "callextfunc" operator is only inserted into the system dictionary if
+a function table is present.  So you will not find it if you attempt to
+execute it from the standard user interface.
+
+Library Entry points
+====================
+
+Prototypes and pragmas for the entry points are defined in the header file.
+
+  Create a PostScript activation
+
+          d0:int arec = PScreateact(a1:struct PSparm *parm)
+
+The result is the address of the new activation record.  If the activation
+fails an error code is returned instead - zero if the interpreter failed
+to start at all because there was insufficient free memory, or an
+interpreter error code if there was an error during initialisation.
+Otherwise the result is the address of the activation record.  The result
+is always returned as an int.  If is is greater than errmax then the
+activation was successful, and the value is an address; otherwise the
+activation failed, and the result is zero or an error code.
+
+  Delete a PostScript activation
+
+          PSdeleteact(a0:APTR arec)
+
+The activation record is deleted and the associated memory is freed.
+
+  Interpret a string or file
+
+          d0:int errnum = PSintstring(a0:APTR arec, a1:char *string,
+                                      d0:int length, d1:int flags)
+
+If the flag PSFLAGSTRING is set, the contents of the string are interpreted
+as PostScript source.  If the flag PSFLAGFILE is set, the string is a file
+name, whose contents are interpreted.  If neither of these flag bits are set
+the string is ignored, but the other flag bits still have their effects; if
+both are set the result is undefined.
+
+If PSFLAGINTER is set (when interpreting a file), the file is considered to
+be interactive.  The banner is printed, and the interpreter prompts for each
+line of input from the file.
+
+If PSFLAGCLEAR is set, then after interpretation the operand stack is
+cleared and the dictionary stack is popped until only the system and user
+dictionaries remain.
+
+If PSFLAGESAVE is set, the vm is saved before interpretation begins and
+restored afterwards.  You would normally use PSFLAGCLEAR with this option,
+to prevent invalidrestore errors.
+
+If PSFLAGERASE is set, then the page is erased.  This happens right at the
+end, after any vm restore, so the page is erased taking into account the
+restored transfer function(s).
+
+This routine is not guaranteed to recurse correctly; strange things may
+happen if you try to call it from an external function called from the
+same activation.
+
+  Signal an interrupt
+ 
+          PSsignalint(a0:APTR arec, d0:int flag)
+
+This routine may be called to set (flag = 1) or clear (flag = 0) the
+interrupt signal flag.  The interpreter tests this flag at the head of its
+main loop, and also within certain potentially length operators (=, ==,
+stack and pstack).  If the flag is set it generates an interrupt error.
+You may safely call this routine at any time during the life of the
+activation.  It is intended to be called from within your task's
+exception handler, if the CTRL/C break signal is set.
+
+  Signal a floating point error
+
+          PSsignalfpe(a0:APTR arec)
+
+This routine is intended to be called whenever a floating point trap is
+generated by the interpreter.  It generates an immediate undefinedresult
+error.  You must not call it at any other time; if you do you will crash
+the machine.  It is only useful if you are using the version of the library
+compiled for the 68881 FPU or compatible chips.  (The software floating
+point routines do not generate traps).  Before calling the library you
+should set up a trap handler and set the bits in the fpcr register to
+enable the traps.  (If you do not set up the traps, the FPU will substitute
+the special value not-a-number for the result and continue.  The
+undefinedresult error will not be triggered, and results of your program
+may be incorrect.)  If you application does not use the FPU you can simply
+direct all traps to the library, otherwise it is essential that you
+ensure that you only call this routine if the trap derived from the library
+and not your own code.
+
+  Error
+
+          PSerror(a0:APTR arec, d0:int errnum)
+
+This routine is intended to be called from within your own flush or copy
+page functions, to signal that an error ocurred.  You can also call it from
+an external function.  You must not call it at any other time; if you do you
+will crash the machine.  It calls the PostScript error handler and never
+returns.  The values for the error number are defined in the header file.
+
+  Allocate virtual machine memory
+
+          d0:unsigned vref = PSallocvm(int arec, int size)
+
+Allocates a block of VM memory of the specified size.  The result a 32 bit
+abstract VM reference, suitable for use in creating PostScript objects; if
+you want to convert the result to a machine address you shall call
+PSvreftoptr.  If the memory cannot be obtained the PostScript error handler
+will be called and this routine will not return.  There is no corresponding
+to free the memory; as with all PostScript VM objects the memory remains
+allocated until the VM is next restore'd to an outer save level.  Abstract
+VM references created in one activation may not be passed to another.
+
+  Convert VM reference to pointer
+
+          d0:void *ptr = PSvreftoptr(int arec, unsigned vref)
+
+Converts an abstract VM reference to a machine address pointer.
+
+  Change device page
+
+          PSsetdevice(a0:APTR arec, a1:struct PSdevice *page)
+
+Changes the device page buffer and dimensions.  If the clip path is still
+set to its initial value (the whole page) it s changed to match the new page
+size; otherwise it is unchanged (and may therefore possibly exceed the new
+page size).  All the clip paths saved on the graphics stack are similarly
+changed.  The CTM at the topmost saved graphics state (the one returned to
+by a "grestoreall" when there are no active VM saves) is reset to match the
+new page size and density.  Otherwise the CTM is not affected; you will
+likely want to execute "initmatrix" afterwards.
+
+The interactions of this routine with the stack of saved graphics states are
+complex, leading to unexpected behaviour unless you understand exactly what
+is happening.  So it is safest to always call it when there are no save's or
+gsave's active, and then to reinitialse the CTM immediately.
+
+This routine should not be called from within a character build, kerning,
+or imaging procedure.
+
+  Return a text string corresponding to an error name
+
+          d0:char *str = PSerrstr(int arec, int errnum)
+
+Converts a postscript error number to a text string.  Returns NULL if the
+number is out of range.
+
+Versions
+========
+
+The version of the library distributed with Post V1.7 has version number 17.
+

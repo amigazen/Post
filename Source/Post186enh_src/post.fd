@@ -1,0 +1,15 @@
+* "post.library"
+##base _PostBase
+##bias 30
+##public
+PScreateact(parm)(a1)
+PSdeleteact(arec)(a0)
+PSintstring(arec,string,length,flags)(a0/a1/d0/d1)
+PSsignalint(arec,flag)(a0/d0)
+PSsignalfpe(arec)(a0)
+PSerror(arec,errnum)(a0/d0)
+PSallocvm(arec,size)(a0/d0)
+PSvreftoptr(arec,vref)(a0/d0)
+PSsetdevice(arec,page)(a0/a1)
+PSerrstr(arec,errnum)(a0/d0)
+##end

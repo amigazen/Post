@@ -1,0 +1,682 @@
+PostScript interpreter - programmer documentation (Post V1.7)
+=============================================================
+
+(C) Adrian Aylward 1989, 1992
+
+Compiler assumptions
+====================
+
+We assume the following data sizes:
+
+    char        1 byte
+    short       2 bytes
+    int         4 bytes
+    float       4 bytes
+    double      8 bytes
+    pointers    4 bytes
+
+Any machine with enough memory to run the interpreter should be able to
+support 4 byte ints; otherwise wholesale modifications would be necessary
+to change ints to longs.  The size of the other types is less important; if
+they were different quite possibly it could be made to work, but it has not
+been tested.  The path fill and clipping routines assume the availability
+of double precision floating point that can handle integers of at least 48
+bits exactly.  The array packing and unpacking routines make assumptions
+about the data sizes of the interpreter objects.
+
+The virtual machine memory allocation routine returns blocks aligned on 4
+byte boundaries; if this is insufficient change the value of "mcalign" in
+the main header file.
+
+We use structure assignment, but not structure arguments.  We expect
+structure member names to be distinct for each different structure type.
+All modern compilers should support this.
+
+We use ansi function prototypes.
+
+We assume that long external symbol names are supported.
+
+The choice of which variables to put in registers is left to the compiler.
+
+The interpreter
+===============
+
+The interpreter is an infinite loop, only returning when the execution stack
+is emptied.  It is recursive: certain operators themselves call the
+interpreter. For example to show a character we must execute its description
+within the font, which is a postscript procedure.  Each recursion level has a
+separate long jump buffer in case of error.
+
+The first part of the interpreter loop fetches an object to be interpreted.
+The object is stored into a local workspace, but is made available externally
+by the global pointer "currtoken".  It remains there for the rest of the
+interpreter cycle.
+
+If the item at the top of the execution stack is executable it must be an
+array, a file or string, or an operator.  (The executable bit is never set
+for other types of object.)  The (dynamically) commonest case is an array,
+so we handle this first.  If we have reached the end of the array we pop it
+off the execution stack and loop.  Otherwise we extract the next element; if
+we have now reached the end we pop the array immediately so as to permit
+arbitrarily deep tail recursion.  The next commonest case is a file, or
+possibly a string. In either case we call the scanner to read the next token,
+popping the execution stack when we reach the end.  Executable operators will
+not usually be on the execution stack; if we find one we will pop it off and
+execute it.
+
+The only common case of a non-executable object on top of the execution stack
+is a control operator, such as "for", "loop", "stopped" etc..  These
+operators have one or more arguments just below them on the stack
+representing loop variables or whatever.  In this case we call the operator
+routine, which can determine it is being called from the top of the execution
+stack by testing the control flag - accessible via "currtoken".  The routine
+will typically update the loop counter and push the procedure to be repeated
+onto the execution stack.  Or if we have finished the last iteration, it will
+just pop itself and its arguments.
+
+In all other cases we simply pop the object off the top of the stack and
+interpret it.
+
+The second part of the loop interprets the object we have fetched.  It
+appears in two versions; one executes objects obtained directly from the
+scanner or fetched from an array; the other is for objects obtained
+indirectly - via name lookup, or popped off the execution stack.  As the
+interpreter loop is speed critical we prefer to have two versions of the
+code rather than set and test a flag.  The only difference between them is
+that in the direct version executable arrays are pushed onto the operand
+stack, but if they were obtained indirectly they are pushed onto the
+execution stack to be executed immediately.
+
+We order the cases so that the (dynamically) most frequent are tested for
+first. If the object is executable, then if it is an operator we call its
+routine, or if it is a name we look it up and jump back to interpret its
+value.  Other cases of executable objects are arrays (direct), files, or
+strings; these are pushed onto the execution stack for their contents to be
+interpreted. Executable nulls do nothing.  All non-executable objects (or
+indirect executable arrays) are pushed onto the operand stack.
+
+The scanner
+===========
+
+The scanner returns the next object token from the input, which may be a file
+or a string.
+
+Strings (ascii or hex) are copied directly into the next free locations in
+the virtual machine memory.  When we get to the end of the string we know its
+length, so we can allocate the block of memory that we have already copied
+the data into.
+
+Executable arrays are constructed on the operand stack.  We recurse to scan
+each of the elements, then build the array object allocating virtual machine
+memory and moving the array data into it.  Packed arrays are packed directly
+into the virtual machine memory, in a similar fashion to strings.
+
+The text for names and numbers is assembled into the name buffer.  When we
+have it all we first try to parse it as a number (unless a "/" preceded it);
+if this fails we build a name object.
+
+When parsing a number we build an integer value being careful to check for
+overflow.  An integer without a radix that overflows is converted to a real.
+If a number with a radix overflows that is an error.  Real values are parsed
+only; we then call a library routine to convert the number to floating point.
+
+Objects
+=======
+
+All objects have an 8 byte representation.  Simple objects contain their
+entire value.  Composite objects contain pointers to their values.
+
+Each object has a type field, a flags field, and a value field.  Objects
+such as arrays and strings have a length field.  Directories are special in
+that their flags are contained in the structure their value points to, rather
+than in the object itself.  (This is so that directory objects sharing the
+same value all have the same access permissions.)
+
+Simple objects
+--------------
+
+Null objects are are binary zeros, so arrays can be trivially initialised.
+
+Integers, reals, and booleans are just a type, flags and a 'C' value field.
+
+Save objects have a type, flags, level number and a generation number (see
+below).
+
+Names
+-----
+
+Names are structures kept in the name table.  The value of a name object is
+a pointer to the name structure.  There are no duplicates in the table, so
+name objects can be compared simply be comparing the pointers.
+
+The name table is a hash table, each entry being a chain of name objects.
+
+The string field of the name structure is a variable length array.  We set
+the array bound to 2 in the definition as the compiler may not like a bound
+of zero (and 2 makes the structure size a multiple of 4).  We adjust the size
+of the entire structure to allow for the actual bound when allocating the
+memory for it.
+
+Dictionaries
+------------
+
+Dictionaries are hash tables.  The number of slots is 1.25 times the maximum
+number of entries + 1, rounded up to the next prime.  If we have a collision
+we can then rehash by adding the initial value of the hash index; since the
+table size is prime this process will look at all the slots in turn - unless
+we started with slot zero, when we add 1 instead.  The number of entries is
+limited to the number specified, so the table is never more than 80% full.
+There is always at least one empty slot, which we will find if they key we
+are looking for is not in the table.
+
+The actual bit pattern of the key object less the flag bits is used as the
+table key.  This means that similar objects with different attribute or
+access permission flags will refer to the same entry.  The key hashing and
+comparison code assumes that the size of the key object structure is the same
+as two ints - and that there are no gaps within it with undefined bit
+patterns.
+
+We store the access permissions in the dictionary structure so that all
+objects with it as their values have the same access permissions.
+
+We store in the dictionary the save stack level of when it was last saved.
+Whenever we update it we check whether the save stack level number is
+greater; if so we must save it again before changing it.
+
+The entries are a variable length array.  We set the array bound to 1 in the
+definition as the compiler may not like a bound of zero.  We adjust the size
+of the entire structure to allow for the actual bound when allocating the
+memory for it.
+
+Arrays
+------
+
+Arrays are simply strings of objects.  They have no header structure, so
+subarrays can easily be referenced.  Unfortunately this means that saving and
+restoring them is rather less efficient (see below).
+
+Packed arrays are readonly, so never need to be saved.  The length in the
+header is the number of objects, and cannot be used to determine the length
+in bytes.  The unpack routine unpacks the next element; for random access it
+must be called repeatedly to scan to the element required.
+
+Strings
+-------
+
+Strings are simply byte strings.  Like arrays the have no header.  They are
+not affected by save and restore.
+
+Files
+-----
+
+All file pointers are held in the file table.  The value of a file object is
+a subscript of this table.
+
+Since more than one file object may refer to the same table slot each open
+file has a generation number.  Then if we reuse a slot it will be obvious if
+we use any old copies of file objects refering to the previous occupant.
+
+Each slot also has an open mode flag so we can check whether the file is open
+for reading or writing without depending upon the operating system's error
+handling.
+
+We also save the last character read from each file.  We can then determine
+when we read the first character of a line, and issue a prompt if the input
+is interactive.  We can also skip the rest of the line it we detect an error.
+
+For encrypted files we also store the curent value of the pseudo random seed.
+The ecryption mode has values 0 = not encrypted, 1 = binary, 2 = hex, -1 =
+end of encrypted portion.
+
+IBM font file format is supported directly.  The read character macro counts
+the size of the file segment, and calls a routine to skip the 6 byte segment
+headers.  As the eexec operator can read binary as well as hex, there is no
+need to translate the binary segments of the file.
+
+The first 3 slots are reserved for %stdin, %stdout, %stderr.  These will have
+already been opened (as far as the operating system is concerned) before
+interpretation begins.  Attempts to close them are ignored.
+
+Operators
+=========
+
+Each operator has its own operator routine (except for aliases).  The value
+of the operator is an index into a function table; this is faster than
+using a switch statement in the interpreter loop, and is also more convenient
+for extensibility.
+
+The routines are coded so that all error checking is completed before any of
+the stacks or contents of the virtual machine memory are altered.  This makes
+error recovery much simpler.
+
+Virtual machine memory
+======================
+
+Memory is allocated sequentially, and is only recovered by a save/restore.
+So allocation is trivial.  Memory is initialised to a zero on startup and
+when recovered subsequently.  (N.B. when the scanner creates a string it
+writes to the memory BEFORE it has been allocated, so we can't initialise
+memory when we allocate it.)
+
+To save the virtual machine state we save the values of the next free memory
+location and remaining length on the save stack.  We add a generation number
+so we can detect use of old copies of save objects.  We also initialise an
+empty list of saved dictionaries and arrays.
+
+Whenever we update a dictionary we check to see if it is supposed to have
+been saved, but hasn't actually been yet.  This test can be done efficiently
+(see the description of the dictionary structure) as befits something likely
+to be done quite frequently.  If we do have to save it we allocate a block of
+memory and copy the entire directory into it, adding the block to the save
+list.
+
+Arrays are not structured like directories.  So when we update one we test to
+see if the array is older than the most recent save.  If so we search the
+save list to see if it has already been saved.  This is much less efficient
+than the test for directories, but hopefully it won't happen quite so often.
+To speed up the search each save level has a small hash table of saved array
+lists.  (Unfortunately there is no header structure to an array, as it might
+be a subarray, so there is nowhere to store the save level to optimise the
+test.) If more than one different, possibly overlapping, subarray of an array
+is updated, then each may appear as a separate entry on the save lists.  It
+is important therefore that the most recently saved copies be linked first on
+the list, so that when the array is restored the data will be correct.
+
+N.B. the last location of the hash table array is used for the dictionary
+save list and is not part of the table proper.
+
+To restore the virtual machine we first check the stacks to make sure they do
+not contain any references to memory that is being recovered; otherwise they
+will be left dangling.  Then we close all files opened since the save, and
+delete all the more recent entries in the name table.  Then for each level we
+are restoring we restore the dictionaries and arrays in the save lists.
+Finally we reset the memory pointers and reinitialise the recovered memory.
+
+Note that strings are not restored.  This is a (dubious) feature of the
+language specification.  At least it is safe, since strings cannot contain
+reference to other virtual machine objects.
+
+The virtual machine is allocated in segments as they are needed.  If a block
+is too large for a single segment then multiple segments are allocated
+contiguously.  References from one object to another are not stored as
+machine addres pointers but rather as abstract references in the form of a
+segment number and offset.  This makes it very easy to compare to references
+to find out which is the most recent, when restoring the virtual machine.
+
+Error handling
+==============
+
+Error trapping is controled by the variable "errorflag".  During
+initialisation this is set to 0 so any errors cause an immediate exit.
+During normal running it is set to 2 so that any errors are trapped; while
+the trap handler is being executed it is set to 1 to temporarily disable
+error trapping to prevent recursion if a further error occurs.
+
+When an error is detected the routine "error" is called.  We save the error
+name, the current command and the stacks in memory.  We then extract the
+error routine from the error dictionary and call it - if there is room on
+the execution stack.  (If the trap handler is temporarily disabled we
+print an error message and return to the lowest level if we are running
+interactively, or otherwise we quit.)  We return to the interpreter loop by
+a longjump.
+
+A special case of the error routine is a quit operation;  the error code has
+the value -1 and we just do the longjump without generating any error
+message.
+
+The initial values of the error routines are simply the ".error" operator.
+This operator takes the error values stored in memory and copies them into
+the $error dictionary.  Then it tries to do a stop.  If there is no stopped
+operator on the execution stack we clear the execution stack down to the
+lowest interactive level as above and call the "handleerror" procedure.
+
+The initial value of the "handleerror" procedure is the ".handleerror"
+operator.  This operator extracts the values stored in the $error dictionary
+and copies them into memory.  Then if the newerror flag was set we clear it
+and print an error message using the values we extracted.
+
+Care should be taken when redefining the error routines.  If a further error
+occurs while interpreting them the error mechanism may loop.  If the
+execution stack overflows it will not be possible to call the error handler;
+the error message will instead be generated directly.  If the operand or
+dictionary stacks overflow then an error handler that tries to push anything
+onto them will fail.
+
+Note that essentially any floating point operation may lead to an error
+trap if there is an overflow.  All routines using floating point are
+carefully written to ensure that their data structures are left consistent if
+this happens.
+
+Recursion
+=========
+
+Some operators have procedures as arguments: transfer functions, spot
+functions, image procedures, and character drawing and kerning procedures.
+These are executed by calling the interpreter recursively.
+
+To prevent problems with dangling references etc. we make prevent vm and
+graphics stack restores from popping to a lower level than that current
+when recursion began.  When we exit from the recursion we always pop them.
+
+To prevent mutual recursion within the routines that set up gray shades,
+and also within the imaging routines (that use static variables), we set
+a flag bit in the interpreter state.  Within this state vm and graphics
+stack saves and restores are not permitted.
+
+We also set a flag bit when within a character drawing routine, so we know
+whether setcharwidth/setcachedevice are permitted.  Within a character
+procedure, if there has not been a vm save, the grestoreall operator has no
+effect.
+
+The operators exit, execstack, countexecstack are limited to the execution
+stack belonging to their own level of recursion.  The stop operator (and
+error handling) will jump to outer levels of recursion if necessary; if
+this happens the vm and graphics stacks will be popped.
+
+Graphics Operations
+===================
+
+Path construction
+-----------------
+
+All path points are held in a single array.  The clipping path occupies the
+first entries, immediately followed by the current path.  If is is necessary
+to adjust the length of the clipping path (which doesn't happen very often)
+the current path is shuffled up or down to make room.  On a gsave operation
+the paths are copied so all the saved paths are present in the array in
+order.
+
+If the path array becomes full a larger array is allocated in its place.
+So all the routines that add path elements have to be careful not to use
+pointers that might become invalid after the array has been extended.
+
+If the clipping path is the default (i.e. the page boundaries) it is not
+stored in the path array, to avoid unnecessary copying on a gsave/restore.
+
+Circles are constructed as a number of Bezier curves. It turns out that the
+number of Beziers needed is remarkably small, even for the largest arc that
+will fit onto the page.  We locate the control points to ensure that the
+slopes of the tangent at the endpoints is correct, as is also the height of
+the centre of the chord.
+
+Beziers are converted to straight lines before the path is flattened.  We
+recursively split the curve into two until it is sufficiently flat to be
+approximated by a straight line.  If the path is explicitly flattened we
+flatten it in situ, otherwise we flatten it into the free space at the end
+of the path array, immediately before drawing it.
+
+Fill operations always operate on closed paths.  It the path is not already
+closed (explicitly), we generate an implicit close.  The line corresponding
+to the close is used for filling and clipping, but is only stroked if the
+close is explicit.
+
+Path Clipping
+-------------
+
+The clipping algorithm proceeds in 3 steps:
+
+    1)  Split all the lines at their intersections.  Great care must be
+        taken to ensure that floating point rounding errors do not cause
+        anomalies.  The code is carefully organised so the determination
+        of whether two lines intersect is exact.  (It does not matter too
+        much if the location of the endpoints slightly off due to rounding
+        errors; what is essential is that we do not miss an intersections
+        and generate topologically absurd figures.)  If two lines are
+        colinear they are considered to intersect at the endpoints.
+
+    2)  Discard all the lines that are not on the boundary of the clip
+        region.  We calculate the winding numbers for both sides of the
+        line, and if one side is inside but not the other it must be on
+        the boundary.  There are various degenerate cases, where the new
+        region is of zero width.  Since PostScript always renders the
+        boundaries of its paths we generate a pair of coincident lines to
+        preserve the degenerate region.
+
+    3)  Rejoin the lines to build the new clip path.  If all the preceding
+        operations were performed correctly they will join up into
+        closed subpaths.
+
+By sorting the lines according to their y coordinates we can make the whole
+algorithm run in time proportional to N ** 1.5.
+
+The workspace for path clipping reuses the same memory as for path filling.
+
+Path Stroking
+-------------
+
+First the path is flatten so it contains only straight lines.  Then each
+line segment of each subpath is stroked individually.  The lines are divided
+into segments as necessary according to the dash pattern.  Each segment is
+stroked individually; its stroke path is constructed and then filled using
+the standard path filling code.  Lines of zero length are ignored. If a
+subpath is not closed then we begin and end with a line cap, otherwise all
+teh lines are joined. Joints are constructed only at a beginning of the line;
+the joint at the end is constructed when the next line is stroked.
+
+Path Filling
+------------
+
+We use what is basically a Y bucket list DDA scan line algorithm.  There are
+some additional complexities:
+
+
+    We only render line segments that are within both the clip and fill
+    paths.  We calculate the winding numbers for both paths using a
+    horizontal test line and render only when we are within both.
+
+    We must render both pixels that are enclosed within the path and also
+    those that are on the boundaries.  This means that we have to calculate
+    the x coordinates for each line at both the bottom and the top of the
+    scan line pixels, and include the area between the values.
+
+Keeping track of two sets of x coordinates for both clip and fill paths
+on the fly would be very awkward, so we generate a list of line segments
+for each, and effectively sort and merge the list.  (We use a simple scoring
+scheme that locates the interior of the segments).  We can then scan the
+list rendering segments as we go.
+
+Care must be taken with the scaling of the line coordinates so that integer
+overflow will not happen, and that accuracy is not lost in the DDA (digital
+differential analyser).  When we initially set up the clip and fill lines we
+clip to the pages boundaries and scale to fixed point integers;  the rest of
+the algorithm then proceeds using much faster integer arithmetic.
+
+The overheads of processing the clip path are only needed when a non-default
+clip path has been set up.  If we have only the initial clip path we can use
+a quicker version of the fill routine that omits processing of the clip
+lines, and runs about twice as fast.  Since we no longer have two sets of
+segment endpoints to merge, we can render them on the fly, dispensing with
+the segment list.
+
+For type 1 fonts, when rendering to the font cache,  we use a special fill
+routine.  In this case we modify the algorithm slightly, to prevent excessive
+blackening in small point sizes.  So we only render the boudaries of the
+path when necessary to prevent dropout.  For right edges we simply skip the
+extra pixel unless the segment length is zero.  For top edges we only fill
+the pixels if the corresponding ones in the next lower row are blank.  Since
+we are rendering to the cache, there is necessarily only a single bit plane,
+and we always draw black.
+
+The workspace for path filling is automatically extended as it is needed.
+
+Imaging
+-------
+
+There are two versions of the imaging routine, one fast and one slow.  If
+there is no clip path, and exactly one sample bit per pixel, and the image
+coordinates are the same as the device coordinates - except possibly for
+reversal of the y direction, then we can use the fast routine that copies
+the image data directly into the device buffer.
+
+In the general case we must use the slow routine.  This routine can only
+handle rectangles, so if when we call the input procedures they return a
+number of bytes that does not correspond to an integral number of image lines
+we render it as 2 or 3 separate rectangles.
+
+The slow rendering routine first constructs the path corresponding to the
+boundaries of the rectangle.  Then it uses the scan line algorithm, similar
+to that for path filling, to render its interior, suitably clipped.  At the
+start of a scan line segment it inverse transforms the device coordinates to
+image space to locate the corresponding sample.  For pixels it adds the
+inverse delta transform of a single pixel step.  We force the result to be
+within the image data, in case prevent rounding errors have shifted it
+slightly.  We unpack the sample values for the entire segment first.  Then
+to avoid repeatedly swapping halftone patterns we search for runs of a
+single shade and render them together.  If we have only a single input
+procedure we can precalculate the shades we will need; this is much faster
+than the multiple procedure case.
+
+Halftones
+---------
+
+Setting up a new halftone screen is slow and complex.  The screen spot
+pattern itself is only recomputed when changed by the setscreen operator,
+or as a result of grestore.  For each possible gray level there is a
+different screen bit pattern, which must be changed every time we do a
+setgray or the like.  In the interests of efficiency we cache the bit
+patterns, preserving as many as we have memory for.
+
+To set up a new spot pattern we first calculate the dimensions of the
+halftone cell when converted into device space.  This is complicated by
+the fact that the x and y pixel densities may be different, so the vertical
+component of the sides of the cell need not be the same as the horizontal
+component of the top and bottom.  We round the sizes to the nearest pixel,
+ensuring that the cell dimensions are at least 1, so that the area is never
+zero.  Then we calculate the area of the cell; this is the number of pixels
+within it, and one less than the number of gray levels. Then comes the
+interesting bit: we need to determine the number of pixels in the x and y
+direction (in device space) after which the pattern repeats itself.  Using
+a bit of number theory we can prove that this is equal to the area divided
+by the gcd of the x or y steps of the cell edges - not forgetting that
+the densities may be different for the two directions, and considering
+gcd(n,0) to be equal to n.  We repeat the spot pattern in the x direction
+as many times as necessary to make the x size a multiple of 8, so we are
+dealing in whole bytes.  So we now have the dimensions of the bit pattern.
+But within the bit pattern the spot pattern may also be repeated more than
+once in the y direction; each repetition being displaced horizontally.
+The distance at which it is repeated is equal to the area divided by the
+distance at which it is repeated in the x direction.  We need to calculate
+the distance by which it is displaced; then we can fill in the entire bit
+pattern without calculating the spot function more than once for each cell
+location.  Rather than resorting to number theory we locate this point by
+stepping along the cell edges until we get there, counting our displacement
+as we go.  With the preliminaries out of the way, (despite the length of
+the description, the calculation is quick) we proceed to call the spot
+function for each point in the cell.  We sort the results, remembering
+their order but discarding the actual values.
+
+We are now ready to set up a bit pattern.  We never need to calculate
+patterns that are wholly black or white, as the drawing routines optimise
+them.  All the rest are cached, using cyclic replacement if we run out of
+cache slots.  If we can't  find the pattern we want, we create it by
+copying the next blacker one.  Then we clear all the bits whose spot value
+should be white but was black in the pattern we copied, replicating the
+spot bits in the x and y directions as necessary.
+
+
+Character Operations
+====================
+
+The font cache
+--------------
+
+We cache the fonts we make.  This is so that repeated calls of makefont
+with identical parameters do not consume VM, and are also fast.  As a cache
+key we use the UniqueID value.  This is the easiest way to determine that
+two fonts are identical.  If it is not present then the font will not be
+cached. (Maybe we should use the disk key, instead?)  We also add the
+address of the encoding vector to the key, as it is legal to change the
+encoding without altering the UniqueID.  On a VM restore operation we must
+purge the cache entries whose font dictionaries are more recent than the
+corresponding save.
+
+The character cache
+-------------------
+
+It is crucial to the speed of character rendering that all the frequently
+used characters are copied from the cache rather than being redrawn each
+time they are needed (something like 100 times faster).  Each cache record
+is a different size, according to the dimensions of the character.  When
+we run out of free cache memory we use a variation on cyclic replacement;
+free slots are amalglamated.  Each slot has a count which is incremented each
+time it is used.  As we scan looking for a free slot we halve the counts,
+freeing the slot when the count reaches zero.  The algorithm is efficient,
+with performance intermediate between cyclic replacement and LRU.  Since
+character generation can be recursive, we have to be careful that while
+deep in the recursion we do not to free a slot being used at a lower level.
+So we temporarily set the usage count to a large number while building the
+character so it will not be freed.  The type 3 font mechanism is recursive,
+so we must be careful not to use so much cache space that there is none left
+for the lower levels of recursion without reusing the record we aallocated
+at the highest level.  So at the highest level we restrict our record to 1/3
+of the cache; that guarantees that there is a contiguous inactive space of
+at least another 1/3 no matter what fragmentation occurs.  At the next level
+we use no more than 1/9, then 1/27 etc..
+
+As a cache key we use the character name (not the code, as we may change the
+encoding vector), the font UniqueID if we have one otherwise the dictionary,
+and the transformation matrix.  For fast searching we use a hash table.
+On a VM restore operation we must purge those cache entries keyed by names
+or dictionaries that are more recent than the corresponding save.  This
+doesn't usually happen for names as most of them are in StandardEncoding, and
+it won't happen for dictionaries if there is a UniqueID.  So characters can
+survive in the cache even after their fonts have been unloaded, at least
+until cache memory runs out.  (Maybe we could save the font cache to disk?)
+
+If the character we want is in the cache we can image it directly into the
+page buffer.  The speed of this routine is critical to the performance of
+the interpreter.  If there is no clip path we can always do a fast cache
+copy.  Otherwise we set up the clip lines like we do for path filling.  If
+some of the lines intersect the rectangle to be imaged then the character
+must be clipped, so we do a slow cache copy.  Otherwise the character must
+either be wholly inside the clip path - when we can do a fast copy, or
+wholly outside - and we don't copy it at all.
+
+The fast copy routine simply images the cache data directly into the page
+buffer.  The slow routine uses the line scan algorithm as for path filling.
+It generates line segments for the inside of the clip path, imaging the
+portions of each which are within the character rectangle.
+
+The show routine
+----------------
+
+All the character drawing operations are handled by a single show routine.
+For charpath we never use the cache; whenever we do a fill or stroke
+instead of drawing in the page buffer the path is copied down to the saved
+graphics state.  For stringwidth we use the cache if the character is small
+enough; we skip both fill and stroke only if we are not using the cache, and
+we accumulate the width.  (The characters are then in the cache if we then
+want to show them).
+
+Whenever we start a character procedure we round our current position to
+a pixel boundary, so all instances of a character have exactly the same
+bit pattern.
+
+The setcachedevice operator diverts output from the page buffer to the
+cache - if the character is small enough.  It saves the width information
+in the cache record and initialises a bitmap for the character.  At the end
+of the build procedure the character is in the cache, and so can be imaged
+into the page buffer.
+
+Type 1 fonts
+------------
+
+Type 1 fonts have their own interpreter to execute the character strings.
+Since the type 1 font mechanism cannot recurse we can use statically
+allocated variables.
+
+The bounding box is calculated by scanning the character path after it has
+been generated, only then can we attempt to set the cache device.  So the
+path is built using a ctm based upon the character origin; if the character
+proves to be too big for the cache the path can be relocated later.
+
+There is no facility for calling PostScript from within a character string.
+The Flex and hint redefinition routines are built in.
+
+If the character fits within the cache a special version of the path
+filling routine is used.  It is rendered at eight bits per pixel in each
+direction, using a special line buffer.  The result is compressed to a
+single bit horizontally, one line at a time.  It is then shifted sideways
+into a second buffer; after eight lines have been processed this is then
+compressed onto the page.  The compression prevents dropout of fine line
+widths while avoiding excessive blackening of small character sizes.

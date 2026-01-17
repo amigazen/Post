@@ -1,0 +1,570 @@
+;***************************************************************************
+;
+; PostScript interpreter file "postlib.a" - library structure (Amiga)
+; (C) Adrian Aylward 1989, 1991
+;
+; This file contains the library structure to which the interpreter objects
+; are linked.  It is Lattice specific.  Whenever a new instance of a
+; PostScript is activated it creates a new data segment for it, in like
+; manner to the cres.o startup.  The library code itself is based on the
+; skeleton in the RKM.
+;
+;***************************************************************************
+
+        include "exec/types.i"
+        include "exec/nodes.i"
+        include "exec/lists.i"
+        include "exec/libraries.i"
+        include "exec/alerts.i"
+        include "exec/initializers.i"
+        include "exec/resident.i"
+        include "exec/memory.i"
+        include "exec/execbase.i"
+        include "exec/funcdef.i"
+        include "exec/exec_lib.i"
+        include "libraries/dosextens.i"
+
+; Linker symbols for the data segment
+
+        xref    LinkerDB        ; Base of data segment
+        xref    RESLEN          ; Length of data+bss segment
+        xref    RESBASE         ; Base offset of data+bss segment
+        xref    NEWDATAL        ; Number of longs in data
+
+; Version numbers
+
+VERSION EQU     16      ; Version nuber
+REV     EQU     0       ; Revision number
+
+; Library base
+
+        STRUCTURE pslib,LIB_SIZE
+        ULONG   pl_EXECBASE
+        ULONG   pl_DOSBASE
+        ULONG   pl_SEGLIST
+        UBYTE   pl_FLAGS
+        UBYTE   pl_pad
+        LABEL   pl_SIZE
+
+;***************************************************************************
+;
+; The text segment (must be the first hunk).
+;
+;***************************************************************************
+
+        csect   text,0
+
+	xref    MemCleanup		  ; Free all allocated memory
+
+	xref    initialise                ; Initialise the interpreter
+        xref    terminate                 ; Terminate the interpreter
+        xref    intstring                 ; Interpret a string or file
+        xref    signalint                 ; Signal an interrupt
+        xref    signalfpe                 ; Signal a floating point error
+        xref    error                     ; Error
+        xref    vmalloc                   ; Allocate VM space
+        xref    vmxptr                    ; Convert VM reference to pointer
+        xref    setdevice                 ; Change device page
+        xref    errstr                    ; Return error name string
+
+        xdef    callextfunc               ; Call external function
+        xdef    flushpage                 ; Flush the page to the screen
+        xdef    copypage                  ; Copy the page to the output
+
+;***************************************************************************
+;
+; The standard library header
+;
+;***************************************************************************
+
+; Return zero, in case someone tries to run us as a program
+
+        moveq   #0,d0
+        rts
+
+; Romtag structure
+
+romtag: dc.w    RTC_MATCHWORD             ; UWORD RT_MATCHWORD
+        dc.l    romtag                    ; APTR  RT_MATCHTAG
+        dc.l    romend                    ; APTR  RT_ENDSKIP
+        dc.b    RTF_AUTOINIT              ; UBYTE RT_FLAGS
+        dc.b    VERSION                   ; UBYTE RT_VERSION
+        dc.b    NT_LIBRARY                ; UBYTE RT_TYPE
+        dc.b    0                         ; UBYTE RT_PRI
+        dc.l    name                      ; APTR  RT_NAME
+        dc.l    idstring                  ; APTR  RT_IDSTRING
+        dc.l    inittab                   ; APTR  RT_INIT
+romend:
+
+; Name strings
+
+name:   dc.b    'post.library',0
+
+idstring:
+        dc.b    'PostLib 1.6 (19 Apr 1991)',13,10,0
+
+dosname:
+        dc.b    'dos.library',0
+
+        ds.w    0
+
+; Initialisation table
+
+inittab:
+        dc.l    pl_SIZE                   ; Data space size
+        dc.l    functab                   ; Function initialisers
+        dc.l    datatab                   ; Data initialisers
+        dc.l    init                      ; Routine to run
+
+functab:
+        dc.l    open                      ; Standard entries
+        dc.l    close
+        dc.l    expunge
+        dc.l    null
+        dc.l    pscreateact               ; Create an activation
+        dc.l    psdeleteact               ; Delete an activation
+        dc.l    psintstring               ; Interpret a string or file
+        dc.l    pssignalint               ; Signal interrupt
+        dc.l    pssignalfpe               ; Signal floating point error
+        dc.l    pserror                   ; Error
+        dc.l    psallocvm                 ; Allocate VM space
+        dc.l    psvreftoptr               ; Convert VM reference to pointer
+        dc.l    pssetdevice               ; Set new device page
+        dc.l    pserrstr                  ; Return error name string
+        dc.l    -1
+
+datatab:
+        INITBYTE        LN_TYPE,NT_LIBRARY
+        INITLONG        LN_NAME,name
+        INITBYTE        LIB_FLAGS,LIBF_SUMUSED+LIBF_CHANGED
+        INITWORD        LIB_VERSION,VERSION
+        INITWORD        LIB_REVISION,REV
+        INITLONG        LIB_IDSTRING,idstring
+        dc.l    0
+
+;***************************************************************************
+;
+; Initialisation and standard library entries
+;
+; Initialisation, open, close, expunge routines
+;
+;***************************************************************************
+
+; Initialisation routine
+
+init:   move.l  a5,-(sp)
+        move.l  d0,a5                     ; Library base
+        move.l  a6,pl_EXECBASE(a5)        ; Exec base
+        move.l  a0,pl_SEGLIST(a5)         ; Segment list
+	lea     dosname(pc),a1
+	moveq   #0,D0
+        jsr     _LVOOpenLibrary(a6)       ; Open DOS library
+	move.l  d0,pl_DOSBASE(A5)
+	bne.s   in1	
+
+        ALERT   AG_OpenLib+AO_DOSLib      ; Alert if we can't open DOS
+
+in1:    move.l  a5,d0
+        move.l  (sp)+,a5
+        rts
+
+; Open routine
+
+open:   move.l  a0,-(sp)
+        move.l  4,a0
+        move.w  AttnFlags(a0),d0          ; Special attention flags
+        bsr.s   getdb
+        sub.l   #RESBASE,a0
+        and.w   attnflags(a0),d0          ; Check for FPU (68881/68020 ...)
+        cmp.w   attnflags(a0),d0
+        move.l  (sp)+,a0
+        beq.s   op1
+
+        moveq   #0,d0                     ; No FPU if needed, can't open
+        rts
+
+op1:    addq.w  #1,LIB_OPENCNT(a6)        ; Increment open count
+        bclr    #LIBB_DELEXP,pl_FLAGS(a6) ; Clear delayed expunge
+        move.l  a6,d0                     ; Return library base
+        rts
+
+getdb:  lea     LinkerDB,a0               ; Original data segment
+        rts
+
+; Close routine
+
+close:  moveq   #0,d0
+        subq.w  #1,LIB_OPENCNT(a6)        ; Decrement open count
+        bne.s   cl1
+        btst    #LIBB_DELEXP,pl_FLAGS(a6) ; Check for delayed expunge
+        bne.s   expunge                   ; Expunge
+cl1:    rts
+
+; Expunge routine
+
+expunge:
+        movem.l d2/a5/a6,-(sp)
+        move.l  a6,a5                     ; Library base
+        move.l  pl_EXECBASE(a5),a6        ; ExecBase
+        tst.w   LIB_OPENCNT(a5)           ; Still open?
+        beq     ex1
+
+        bset    #LIBB_DELEXP,pl_FLAGS(a5) ; Flag delayed expunge
+        moveq   #0,d0
+        bra.s   ex2
+
+ex1:    move.l  pl_SEGLIST(a5),d2         ; We will return the segment list
+        move.l  a5,a1
+        jsr     _LVORemove(a6)            ; Remove from list
+        move.l  pl_DOSBASE(a5),a1
+        jsr     _LVOCloseLibrary(a6)      ; Close DOS library
+        moveq   #0,d0
+        move.l  a5,a1
+        move.w  LIB_NEGSIZE(a5),d0
+        sub.l   d0,a1
+        add.w   LIB_POSSIZE(a5),d0
+        jsr     _LVOFreeMem(a6)           ; Free the memory
+        move.l  d2,d0
+
+ex2:    movem.l (sp)+,d2/a5/a6
+        rts
+
+; Null routine (reserved)
+
+null:   moveq   #0,d0
+        rts
+
+;***************************************************************************
+;
+; User defined library entries
+;
+;***************************************************************************
+;
+; Create a PostScript activation
+;
+;         d0:int arec = PScreateact(a1:struct PSparm *parm)
+;
+;***************************************************************************
+
+pscreateact:
+        movem.l a2-a6,-(sp)
+        move.l  a1,a2                     ; parm
+        move.l  a6,a5
+        move.l  pl_EXECBASE(a6),a6        ; ExecBase
+        move.l  #RESLEN,d0                ; Length of data segment
+        move.l  #MEMF_CLEAR+MEMF_PUBLIC,d1
+        jsr     _LVOAllocMem(a6)          ; Allocate the memory
+        tst.l   d0                        ; New data segment
+        beq.s   cax                       ; No memory, return zero
+        move.l  d0,a3                     ; New data segment
+        bsr.w   getdb
+        sub.l   #RESBASE,a0
+        move.l  #NEWDATAL,d1              ; Number of longs (<64K!)
+        bra.s   ca2
+
+ca1:    move.l  (a0)+,(a3)+               ; Copy data
+ca2:    dbf     d1,ca1
+
+        move.l  (a0)+,d1                  ; Number of relocs (<64K!)
+        bra.s   ca4
+
+ca3:    move.l  (a0)+,a3                  ; Offset to relocate
+        add.l   d0,a3                     ; Address to relocate
+        add.l   d0,(a3)                   ; Relocate it
+ca4:    dbf     d1,ca3
+
+        move.l  d0,a4                     ; New data segment
+        add.l   #RESBASE,a4
+        move.l  pl_EXECBASE(a5),SysBase(a4)
+        move.l  pl_DOSBASE(a5),DOSBase(a4)
+        move.l  ThisTask(a6),a3           ; Current directory
+        move.l  pr_CurrentDir(a3),curdir(a4)
+
+        move.l  a2,-(sp)                  ; parm
+        jsr     initialise(pc)            ; Call initialisation routine
+        addq.l  #4,sp
+
+        cmp.l   #-1,d0
+        bne.s   da1                       ; Failed to initialise, tidy up
+
+        move.l  a4,d0
+        sub.l   #RESBASE,a4               ; Return base of new segment
+
+cax:    movem.l (sp)+,a2-a6
+        rts
+
+
+;***************************************************************************
+;
+; Delete a PostScript activation
+;
+;         PSdeleteact(a0:APTR arec)
+;
+;***************************************************************************
+
+psdeleteact:
+        movem.l a2-a6,-(sp)
+        move.l  a0,a4
+        add.l   #RESBASE,a4
+
+da1:    move.l  d0,-(sp)                  ; Save result for return
+        jsr     terminate(pc)             ; Call termination routine
+        jsr     MemCleanup(pc)            ; Cleanup leftover memory
+        move.l  #RESLEN,d0                ; Length of data segment
+        move.l  SysBase(a4),a6
+        move.l  a4,a1
+        sub.l   #RESBASE,a1
+        jsr     _LVOFreeMem(a6)           ; Free the memory
+        move.l  (sp)+,d0                  ; Restore result
+        movem.l (sp)+,a2-a6
+        rts
+
+;***************************************************************************
+;
+; Interpret a string or file
+;
+;         d0:int errnum = PSintstring(a0:APTR arec, a1:char *string,
+;                                     d0:int length, d1:int flags)
+;
+;***************************************************************************
+
+psintstring:
+        move.l  a4,-(sp)
+        move.l  a0,a4
+        add.l   #RESBASE,a4
+        move.l  d1,-(sp)                  ; Flags
+        move.l  d0,-(sp)                  ; Length
+        move.l  a1,-(sp)                  ; String
+        jsr     intstring(pc)             ; Call interpreter
+        add.w   #12,sp
+        move.l  (sp)+,a4
+        rts
+
+;***************************************************************************
+;
+; Signal an interrupt
+;
+;         PSsignalint(a0:APTR arec, d0:int flag)
+;
+;***************************************************************************
+
+pssignalint:
+        move.l  a4,-(sp)
+        move.l  a0,a4
+        add.l   #RESBASE,a4
+        move.l  d0,-(sp)                  ; flag
+        jsr     signalint(pc)             ; Signal interupt
+        addq.l  #4,sp
+        move.l  (sp)+,a4
+        rts
+
+;***************************************************************************
+;
+; Signal a floating point error
+;
+;         PSsignalfpe(a0:APTR arec)
+;
+;***************************************************************************
+
+pssignalfpe:
+        move.l  a4,-(sp)
+        move.l  a0,a4
+        add.l   #RESBASE,a4
+        jsr     signalfpe(pc)             ; Signal floating point error
+;       move.l  (sp)+,a4                  ; No return
+;       rts
+
+;***************************************************************************
+;
+; Error
+;
+;         PSerror(a0:APTR arec, d0:int errnum)
+;
+;***************************************************************************
+
+pserror:
+        move.l  a4,-(sp)
+        move.l  a0,a4
+        add.l   #RESBASE,a4
+        move.l  d0,-(sp)
+        jsr     error(pc)                 ; Call error routine
+;       addq.l  #4,sp                     ; No return
+;       move.l  (sp)+,a4
+;       rts
+
+;***************************************************************************
+;
+; Allocate VM space
+;
+;         d0:unsigned vref = PSallocvm(a0:APTR arec, d0:int size)
+;
+;***************************************************************************
+
+psallocvm:
+        move.l  a4,-(sp)
+        move.l  a0,a4
+        add.l   #RESBASE,a4
+        move.l  d0,-(sp)
+        jsr     vmalloc(pc)               ; Allocae VM space
+        addq.l  #4,sp
+        move.l  (sp)+,a4
+        rts
+
+;***************************************************************************
+;
+; Convert VM reference to pointer
+;
+;         a0:void *vptr = PSvreftoptr(a0:APTR arec, d0:unsigned vref)
+;
+;***************************************************************************
+
+psvreftoptr:
+        move.l  a4,-(sp)
+        move.l  a0,a4
+        add.l   #RESBASE,a4
+        move.l  d0,-(sp)
+        jsr     vmxptr(pc)                ; Convert VM reference to pointer
+        addq.l  #4,sp
+        move.l  (sp)+,a4
+        rts
+
+;***************************************************************************
+;
+; Change device page
+;
+;         PSsetdevice(a0:APTR arec, a1:struct PSdevice *page)
+;
+;***************************************************************************
+
+pssetdevice:
+        move.l  a4,-(sp)
+        move.l  a0,a4
+        add.l   #RESBASE,a4
+        move.l  a1,-(sp)
+        jsr     setdevice(pc)             ; Change device page
+        addq.l  #4,sp
+        move.l  (sp)+,a4
+        rts
+
+;***************************************************************************
+;
+; Return error name string
+;
+;         PSerrstr(a0:APTR arec, d0:int errnum)
+;
+;***************************************************************************
+
+pserrstr:
+        move.l  a4,-(sp)
+        move.l  a0,a4
+        add.l   #RESBASE,a4
+        move.l  d0,-(sp)
+        jsr     errstr(pc)                ; Return error name string
+        addq.l  #4,sp
+        move.l  (sp)+,a4
+        rts
+
+;***************************************************************************
+;
+; Other assembler routines
+;
+;***************************************************************************
+;
+; Call an external function, using a C calling sequence
+;
+;     void callextfunc(APTR func, int *argv, int argc)
+;
+;***************************************************************************
+
+callextfunc:
+        move.l  4(sp),a0                  ; Function
+        move.l  8(sp),a1                  ; Parameters array
+        move.l  12(sp),d0                 ; Number of parameters
+        move.l  a5,-(sp)                  ; Save the stack pointer
+        move.l  sp,a5
+        move.l  d0,d1
+        lsl.l   #2,d1
+        add.l   d1,a1                     ; End of parameters array
+        bra.s   cf2
+
+cf1:    move.l  -(a1),-(sp)               ; Push object value unto stack
+cf2:    dbf     d0,cf1
+
+        jsr     (a0)                      ; call the function
+        move.l  a5,sp                     ; restore the stack pointer
+        move.l  (sp)+,a5
+        rts
+
+;***************************************************************************
+;
+; Flush the page to the screen.  Call the flush function if we have one.
+;
+;     void flushpage(int y1, int y2)
+;
+;***************************************************************************
+
+flushpage:
+        move.l  flushfunc(a4),d0          ; Get the function
+        beq.s   fp1
+        move.l  d0,-(sp)                  ; Push function
+        move.l  a4,a0                     ; Activation record (a0 = arec)
+        sub.l   #RESBASE,a0
+        move.l  userdata(a4),a1           ; User data pointer (a1 = udata)
+        move.l  8(sp),d0                  ; y1
+        move.l  12(sp),d1                 ; y2
+fp1:    rts                               ; Call it (d0 = y1, d1 = y2)
+
+;***************************************************************************
+;
+; Copy the page to the output.  Call the copy function if we have one.
+;
+;     void copypage(int num)
+;
+;***************************************************************************
+
+copypage:
+        move.l  copyfunc(a4),d0           ; Get the function
+        beq.s   cp1
+        move.l  d0,-(sp)                  ; Push function
+        move.l  a4,a0                     ; Activation record (a0 = arec)
+        sub.l   #RESBASE,a0
+        move.l  userdata(a4),a1           ; User data pointer (a1 = udata)
+        move.l  8(sp),d0                  ; num
+cp1:    rts                               ; Call it (d0 = num)
+
+;***************************************************************************
+;
+;    The Data segment (data + bss)
+;
+;***************************************************************************
+
+        csect   __MERGED,1         ; Data
+
+        xref    attnflags          ; Required machine flags (68881/68020...)
+
+        csect   __MERGED,2         ; BSS
+
+        xref    DOSBase            ; DOS library base
+
+        xref    userdata           ; User data pointer
+        xref    flushfunc          ; Flush page function
+        xref    copyfunc           ; Copy page function
+
+        xdef    SysBase
+        xdef    curdir
+        xdef    _oserr
+        xdef    _OSERR
+        xdef    _FPERR
+        xdef    _ONBREAK
+
+
+SysBase:        ds.b    4          ; Exec library base
+curdir:         ds.b    4          ; Current directory
+_oserr          equ     *
+_OSERR:         ds.b    4          ; Operating system error number
+_FPERR:       	ds.b    4          ; Floating point error number
+_ONBREAK:       ds.b    4          ; Break trap routine
+
+        end
+
+; End of file "postlib.a"
