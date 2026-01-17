@@ -18,7 +18,7 @@
 #SCFPT  = MATH=STANDARD              # Lattice IEEE library
 #LIBFPT = lib:scm.lib      # Lattice IEEE library
 
-SCCPU  = CPU=68030              # 68020 (or 68030)
+SCCPU  = CPU=68020              # 68020 (or 68030)
 SCFPT  = MATH=68881 DEFINE=M68881     # 68881 (or 68882)
 LIBFPT = lib:scm881.lib   # 68881 (or 68882)
 

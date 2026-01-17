@@ -54,7 +54,7 @@ REV     EQU     0       ; Revision number
 
         csect   text,0
 
-	xref    MemCleanup		  ; Free all allocated memory
+;	xref    MemCleanup		  ; Free all allocated memory - not implemented
 
 	xref    initialise                ; Initialise the interpreter
         xref    terminate                 ; Terminate the interpreter
@@ -309,7 +309,7 @@ psdeleteact:
 
 da1:    move.l  d0,-(sp)                  ; Save result for return
         jsr     terminate(pc)             ; Call termination routine
-        jsr     MemCleanup(pc)            ; Cleanup leftover memory
+;       jsr     MemCleanup(pc)            ; Cleanup leftover memory - not implemented
         move.l  #RESLEN,d0                ; Length of data segment
         move.l  SysBase(a4),a6
         move.l  a4,a1
@@ -554,16 +554,18 @@ cp1:    rts                               ; Call it (d0 = num)
         xdef    curdir
         xdef    _oserr
         xdef    _OSERR
-        xdef    _FPERR
+;       xdef    _FPERR                     ; Conflict with lib:sc.lib
         xdef    _ONBREAK
+        xdef    _ufbs                      ; SAS/C file buffer array (3 UFB structures = 36 bytes)
 
 
 SysBase:        ds.b    4          ; Exec library base
 curdir:         ds.b    4          ; Current directory
 _oserr          equ     *
 _OSERR:         ds.b    4          ; Operating system error number
-_FPERR:       	ds.b    4          ; Floating point error number
+; _FPERR:       	ds.b    4          ; Floating point error number - use _FPERR from lib:sc.lib
 _ONBREAK:       ds.b    4          ; Break trap routine
+_ufbs:          ds.b    36         ; File buffer array (3 UFB structures: stdin, stdout, stderr)
 
         end
 
