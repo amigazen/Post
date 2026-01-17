@@ -1,0 +1,609 @@
+Postscript interpreter - user documentation
+===========================================
+
+Post V1.3 Copyright Adrian Aylward 1989, 1990
+
+Free use and non-commercial reproduction of the binaries of the interpreter
+library (post.library) is permitted, providing that the copyright notices
+are not removed.  Distribution by disk libraries is permitted provided only
+a nominal copying fee is charged.
+
+You may freely copy, use and modify the user interface program (post).  The
+source is included in the distribution.
+
+All other rights are reserved.  For queries and bug reports write to the
+author:
+
+        Adrian Aylward,
+        20 Maidstone Road,
+        SWINDON,
+        Wiltshire.
+        UK.
+
+No responsibilities accepted for bugs, but please let me know so I can fix
+them.
+
+Introduction
+============
+
+"Post" is a software based PostScript interpreter, presently running on the
+Amiga.  The source code is written in C, and should be fairly portable to
+other machines.  It supports the full Adobe language, with only minor
+variations.
+
+Prerequisites
+=============
+
+Post uses the Arp library (V39+), primarily for its file requestor.  For
+interactive working you also need ConMan (V1.3+).  Both these programs are
+widely available; any good BBS or PD/shareware library should have them.
+(ConMan is shareware.)  You may well have them installed on your machine
+already.
+
+If you prefer not to install ConMan as your standard console handler, you
+will need to access it via an alternative device name, which you must
+specify by the CONDEV option.
+
+You will need at least a megabyte of memory, more for high density printer
+output.
+
+Command line interface
+======================
+
+usage:
+    post [files...] [IFF file] [SCREEN] [PRINTER] [INTERACTIVE]
+         [SIZE xyod..s..p.bc.] [MEM fhlv..] [CLOSEWB] [CONDEV con]
+
+If you forget, type "post ?" to display this.
+
+The input files
+---------------
+
+The interpreter reads the input files in turn.  When running interactively
+the input files are treated as startup files, and are rerun whenever the
+interpreter is restarted.  So you would normally specify just the standard
+startup file "init.ps", or an alternative of you own.  When running
+non-interactively you should in addition specify all the files you want to
+interpret, up to 5 in total; when the last is finished the interpreter will
+exit.
+
+Printer output
+--------------
+
+This is the default if neither the IFF nor SCREEN options are used, when
+running non-interactively.  The output is sent to the printer device as a
+graphic dump.
+
+The interpreter will obtain default values for the page size, density, and
+number of colors from the current preferences.  If you use the default sizes
+make sure you have set the page size: run preferences and on the graphic 2
+screen set the width and height limits -  either bounded or absolute or in
+pixels.  The output defaults to black and white or 3 colour, according to
+the preferences.
+
+IFF file output
+---------------
+
+This option will send the output to an IFF file.  Each IFF file contains a
+single FORM ILBM.  So that multiple pages may be created in a single run of
+the interpreter, sequence numbers are automatically generated:
+
+    IFF path/fred*.pic   will generate  path/fred1.pic, path/fred2.pic ...
+and IFF path/fred??.pic  will generate  path/fred01.pic, path/fred02.pic ...
+
+The default page size etc. is the same as for screen output.
+
+SCREEN output
+-------------
+
+This option  will send the output to a window on the interactive screen.  It
+implies interactive working.
+
+You can generate screen, printer and IFF output at the same time.  But since
+screen output has to use chip memory and printer output at high resolution
+needs a large page buffer (about a megabyte for an A4 page at 300 dpi.) you
+will probably run out of memory if you attempt the two simultaneously.
+
+The default screen size is the same as the workbench screen, but in
+interlace mode.  The default page size is A4, with a density of 75 pixels
+per inch.  The default number of colours is 3.  The page size is rounded up
+to the maximum size of the window.
+
+The INTERACTIVE option
+----------------------
+
+This option causes the interpreter to run interactively.  A screen is opened
+and on it appears a requestor window for the parameters.  If you click on
+OK two windows will be opened, one for console input and output, and the
+other to display the page buffer.  Use the menus.
+
+The SIZE option
+---------------
+
+The SIZE option sets the page size and density etc..
+
+    SIZE "x..y..s..xo..yo..[x]d..[y]d..p.bc."
+
+Up to 5 SIZE options are allowed; later values override earlier ones.
+
+The page sizes ("x..y..s..") are in pixels, as decimal numbers; "s" sets
+the size of the bands, for band rendering to the printer.  The page offsets
+are in pixels, shifting the location of the bottom left of the bitmap
+relative to the PostScript logical page (origin at (0,0) in the initial user
+space). Densities ([x]d..[y]d..) are in pixels per inch; "xd" or "yd" set
+the x or y density, and "d" sets both.
+
+The printer density can be set by "p"; its value should be in the range 
+1 to 7.
+
+The number of colours is: "b" for black and white (1 bit plane), "c" or "c3"
+for 3 colour rgb (3 bit planes), and "c4" for 4 colour cmyk (4 bit planes).
+
+The MEM option
+--------------
+
+The MEM option controls the amount of memory allocated for workspace.
+
+    MEM "v..f..l..h.."
+
+Up to 5 MEM options are allowed; later values override earlier ones.
+
+The memory defaults are chosen to suit a large machine processing relatively
+complex pages.  For simple screen output much lower minimums are possible -
+if you don't have enough memory on your machine try the small values
+instead.
+
+    Default   Small
+    -------   -----
+    v600000  (80000)     Virtual machine memory
+     f60000   (1000)     Font cache
+     l60000   (8000)     Line drawing and image workspace
+     h20000   (1000)     Halftone buffer
+
+     (x+64) * (y+16) / 8 Page buffer
+
+The default values should run on a 1.5MB machine with output to the screen
+On a 2MB machine it should be possible to generate a complex A4 page of
+printer output at 300 dpi.
+
+The CLOSEWB option
+------------------
+
+If memory is tight, you can try using this option to close down WorkBench
+while Post is running.  This only works if there are no application
+windows open on the WorkBench screen.
+
+The CONDEV option
+-----------------
+
+If you do not have ConMan installed as the default console handler, you
+must use this option to specify its device name (without the ":").
+
+Examples
+--------
+
+To run postscript programs interactively, rendering to the screen:
+
+    post init.ps screen
+
+To print a file with many big characters using a large font cache and
+increasing the path limit:
+
+    post init.ps myfile.ps printer mem f500000l200000
+
+To render a series of 640 * 512 pictures at 762 dpi. to iff files t:i01,
+t:i02 etc.:
+
+    post init.ps mypics.ps iff t:i?? size x640y512d72
+
+The WorkBench interface
+=======================
+
+Just click on the icon.  It always runs interactively.  You can set up
+default arguments by setting the ToolTypes; add a string "ARGS=...."
+and it will be parsed just like the CLI startup.  For example
+"ARGS=init.ps screen" will define the standard startup file and make the
+screen the default output.
+
+The Menus
+=========
+
+Project
+    Restart              Takes you back to the parameters requestor, after
+                         which the interpreter is reinitialised.
+
+    Quit                 Quit from the program
+
+File
+    Load font            Loads a file from the PSFonts: directory by default
+
+    Load file            Loads a file, without saving or restoring the VM
+
+    Run file             Runs a file, saving VM before and restoring after
+
+    Interactive          Interprets interactive input
+
+Control
+    Pause every page     Toggles pause every showpage/copypage
+
+    Continue after pause Does just that
+
+    Interrupt            Sends a break; equivalent to CTRL/C
+
+Before and after executing a file the operand stack is cleared.  This is
+to prevent invalidrestore errors, particularly if interpretation ended in
+error with values on the stack.  If you need to leave things on the stack
+you will have to run the files from a driver file, or from the interactive
+window.  At the end of the file, (after any restore), the page is erased.
+
+If you use the automatic font loading, as defined in the standard startup
+file "init.ps", the font will be discarded when the VM is restored.  To
+avoid repeated reloading of common fonts it may be better to use the "Load
+font" menu item to preload the ones you want.  N.B. there is no check to
+stop you loading the same one twice; it will probably work but it will
+waste memory.
+
+Compatability
+=============
+
+The interpreter is based upon the language (version "23.0") as described by
+the (red) book:
+
+    "PostScript Language Reference Manual"
+    Adobe Systems Incorporated,
+    Addison-Wesley 1985, ISBN 0-201-10174-2
+
+The 4 colour operators are also supported as described by the document:
+
+    "PostScript Language Color Extensions"
+    Adobe Systems Incorporated (23-Jan-90)
+
+File handling
+-------------
+
+The files %stdin, %stdout, %stderr are permanently open as far as the
+operating system is concerned.  Attempts to close them will invalidate the
+file object but not close them to the operating system.  If they are
+connected to a terminal they will be unbuffered, so output will be
+transmitted immediately, without waiting for a "flush".  The special files
+%statementedit and %lineedit are not supported.  There is no end of file
+control character.
+
+Error handling
+--------------
+
+A new error "invalidstop" has been added.
+
+The execution stack
+-------------------
+
+The exact contents of the execution stack are not defined by the language
+reference manual, and cannot therefore be guaranteed to be the same as other
+implementations.  Dumping the stack is likely to yield useful debugging
+information but is not recommended for normal programming.
+
+Colour mapping
+--------------
+
+The interpreter can run with one bit plane (for black and white printers),
+3 bit planes (red, green, blue) or 4 bit planes (cyan, magenta, yellow,
+black).  For screen output 3 bit planes are appropiate.  For a colour
+printer the 3 or 4 colour model can be used.  The output is always in
+binary; gray scale is supported only via the halftone mechanism.
+
+For low resolution colour printers the 3 colour model is probably best.
+The 4 color model is for high resolution colour printers that can generate
+high frequency halftone screens, where a fourth screen is used to improve
+the quality of the blacks and grays.
+
+(N.B. the preferences printer drivers only handle 3 colour model, so if
+you want to use the 4 colour model you will probably need to generate an
+IFF file and write your own print dump program.  They will however
+automatically use black the ribbon/ink if the printer has one)
+
+The transformations between the RGB and the HSB models are based on those in
+the book:
+
+    "Procedural Elements for Computer Graphics"
+    David F. Rogers,
+    McGraw-Hill 1985, ISBN 0-E07-053534-5.
+
+Band Rendering
+--------------
+
+For a high resolution printer the page buffer can be quite large (a megabyte
+or so).  If you don't have enough memory to hold the entire page at once you
+can render each one in several bands.  Set the "SIZE s..." option to the
+largest band size you have space for.  (For matrix printers it will probably
+be best to make it a multiple of the number of printer pins times the number
+of vertically displaced passes).  Then run the postscript program generating
+each page once for each band, using the "setband" operator, which is
+described below, to set the base for each band.  Start at a base of zero
+and increment the base by the band size until you reach the page height.
+Each band is sent to the printer as a separate graphic dump; the last band
+generates a form feed to eject the page.  You can use the "currentband"
+operator to calculate the number of bands needed:
+
+    currentband 1 sub { setband pageproc } for 0 setband
+
+will execute "pageproc" once for each band (remaining) on the page.  The
+procedure should execute copypage (or showpage) exactly once per iteration.
+
+N.B. this technique is only suitable for printer output.
+
+Fonts
+-----
+
+There are no fonts built in to the interpreter; they must all be downloaded.
+The findfont operator will execute the error invalidfont if the font you
+request is not present in the font dictionary.  You can redefine it, perhaps
+to search the Unix/Amiga filing system to automatically download fonts or to
+substitute a default font.  See the standard startup file.
+
+Both type 1 (Adobe encrypted format) and type 3 (standard PostScript as per
+the red book) fonts are now supported.  In addition the IBM font format can
+be read directly.
+
+The font caching will work significantly better if all your fonts have
+UniqueID's.  Then repeated makes of the same font with the same matrix will
+be cached, and cached character bitmaps can be retained even if the font
+is removed by a restore operation.  N.B. if fonts are downloaded after a
+save they will be removed by the corresponding restore; in the interests of
+efficiency it may therefore be better to preload them.
+
+Other features
+--------------
+
+Names of the form //name are looked up immediately by the scanner, and
+packed arrays have been implemented.  These features were not on the
+original Adobe red book, but were added to the language specification later.
+
+When scanning the contents of a string, if there any embedded strings the
+escape sequences are interpreted just as they are in a file.  This follows
+the specification of the more recent Adobe interpreters (including display
+PostScript) and not the original red book.
+
+Operators omitted or changed
+----------------------------
+
+    banddevice
+
+Not appropiate for the Unix/Amiga environment.
+
+    bytesavailable
+
+Since we can't tell how many bytes are available we always return -1.
+
+    copypage
+
+For printer output this works like the standard.  The number of pages
+printed is equal to #copies.  For screen output it does not need to do
+anything, as the screen is not buffered.  For IFF file output it writes the
+page to the next file.
+
+    echo
+
+Not appropiate for the Unix/Amiga environment.
+
+    eexec
+
+This is implemented as per the Adobe type 1 fonts book.  Its operand must be
+a file, which must match the object on top of the execution stack.  It can be
+terminated only by a closefile (which terminates the eexec but does not
+actually close the file).  So the sequences "currentfile eexec" and
+"currentfile closefile" as described in the book will work, but other
+combinations will likely fail.
+
+    executive
+
+There is no executive, as the interpreter supports interactive usage
+directly.
+
+    findfont
+
+Looks in the FontDirectory.  If it can't find the supplied key, it executes
+the error invalidfont.
+
+    flushfile
+
+We don't check for errors when flushing an input file, to prevent recursion
+in the error handler.
+
+    framedevice
+
+Not appropiate for the Unix/Amiga environment.
+
+    prompt
+
+Not called by the interpreter.  See "prompts" instead.
+
+    renderbands
+
+Not appropiate for the Unix/Amiga environment.
+
+    resetfile
+
+Does nothing.
+
+    showpage
+
+See the notes for copypage above.
+
+    usertime
+
+Returns the time elapsed since the interpreter started, with a resolution of
+one second.
+
+Operators added
+---------------
+
+    currentband
+
+        "currentband" base size height
+
+Returns the base of the current band, size of each band, and total height
+of the page.
+
+    setband
+
+        base "setband"
+
+Sets the base height of the band being rendered.  The value must be greater
+than or equal to zero and less than the total height of the page.
+
+    fontfile
+
+        (filename) "fontfile"
+
+Opens a file for reading.  If the first byte is hex "80" the file is assumed
+to be in IBM font format, and its contents are converted to standard
+ascii/binary as they are read.  The standard input file (%stdin) is never in
+IBM font format.
+
+    invalidstop
+
+        (error)
+
+A "stop" has been executed for which there is no dynamically enclosing
+"stopped" context.
+
+    prompts
+
+        string string "prompts"
+
+The first string is used as the prompt when the interpreter is scanning
+terminal input and executing it immediately; the second string is used when
+execution is defered while scanning the contents of a procedure "{ ... }".
+No prompt is given when a newline is encountered within a string.
+
+    vmhwm
+
+        "vmhwm" hwmused maximum
+
+Returns two integers: the high water mark of the amount virtual memory used
+since the program was first started or the last "vmhwm", and the maximum
+available amount of memory.
+
+Miscellaneous
+-------------
+
+The system dictionary is left writeable so that standard preludes can add
+things to it - possibly removing write permission when they have finished.
+Similarly FontDirectory is writeable, so that it is possible to add entries
+without using definefont.
+
+Device space
+------------
+
+The largest device that the interpreter can handle is 31767 (sic) by 32767
+pixels.  In practice you will probably run out of memory long before
+reaching this limit.
+
+Known Bugs
+==========
+
+If you close down WorkBench the menus sometimes get truncated and slightly
+corrupted.  I suspect this is a Workbench/Intuition problem.
+
+If you type CTRL/C to abort if the printer is not ready then strange things
+may happen on subsequent attempts to print.
+
+N.B. if you run very low on memory, Intuition may behave strangely, and
+refuse to resize windows etc..  This is not a bug in Post.
+
+If you type CTRL/backslash in the interactive window you won't be able to
+run interactively again until a restart.
+
+Post tries to keep the console window active, so that all keyboard input
+goes there.  It will probably be incompatible with mouse handlers that
+automatically activate the window under the cursor.
+
+Versions
+========
+
+    V0.0  14-Nov-89 (prerelease)
+
+The original.
+
+    V0.1  06-Dec-89 (prerelease)
+
+Image routines added.
+
+Range checks eased on gray levels and colours etc..
+
+Area filling speeded up, matrix manipulation and colour mapping rewritten,
+numeric conditioning improved for path fill.
+
+Bugs fixed: syntax error, == string escapes, error handling and quit when
+recursing, vm error handling, integer overflow in path fill, matrix save,
+interrupt after printing page, dictionary second save, name table restore,
+boolean type checking, multiple halftone screens memory allocation.
+
+    V0.2  07-Jan-90 (prerelease)
+
+Font and character routines added.  Null device added.  Band rendering of
+printer output added.
+
+Matrix manipulation rewritten again.  Interpreter recursion rewritten.
+Allocate stacks dynamically.
+
+Bugs fixed: missing access checks on strings, scan token negative chars,
+depth check in path flattening, pathbbox, strings or null objects as
+dictionary keys, shade after grestore(all), fill/image with clip region,
+clip unclosed subpath, dictstack/execstack.
+
+    V1.0  12-Feb-90
+
+Support for big scrollable windows added.  Menu handler added with port
+name option.  Workbench startup added with parameters requestor window.
+
+Hex string scan optimised.  Break now CTRL/C only, not CTRL/D.
+
+Bugs fixed: aspect ratio in iff file, clipping pictures much wider than the
+page.
+
+    V1.1  27-Mar-90
+
+Interpreter made into shared library.  Message port interface removed.
+Band printing driver now included.
+
+Immediate lookup of //name added.  Packed arrays added.  CR and CRLF now
+converted to LF for readline and when scaning tokens from a file.  Copypage
+now takes account of #copies. 
+
+Bugs fixed: slow images where strings are not rectangles, attributes after
+copy and bind, charpath with fonts using gsave, iff run compression,
+setundercolorremoval now conforms to Adobe spec, make errorname literal,
+slow images repositioned by 1/2 pixel.
+
+    V1.2  14-Oct-90
+
+Allow multiple SIZE and MEM options.
+
+Page offset option added, page size defaults to A4, integer gadgets checked
+for +ve values.
+
+Type 1 fonts, IBM font format, encrypted files, eexec operator added.
+
+Bugs fixed: location zero not zero, printer device signals, proc arrays not
+executable, bind packed arrays, restore closing files, makefont matrices not
+commutative, makefont with translation, error handling during recursion,
+graphics state within buildchar proc, miterlimit less that sqrt(2), cvs
+copying too many bytes, solid lines after dashes, floating point error trap
+recursion (2620 version on 68882), check for fpu present, charpath with null
+character path, error handling loading file, invalid restore check,
+writehexstring.
+
+    V1.3  27-Oct-90
+
+LaserJet driver added.
+
+Interface fixes: Menus no longer ghost after startup file error and restart,
+pause status is now retained over a restart, printer preferences page size
+is now handled correctly, no longer crashes if arp.library is missing.
+
+Bugs fixed: IBM binary eexec sections beginning with white space, funny
+characters in error message command names, hints with stems of negative
+width, font character cache sizing, tune baseline alignment and flex,
+eexec lines ending in CR (not CRLF), aload packed arrays, zero length
+charstrings, font character cache hash chains.
