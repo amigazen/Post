@@ -1,9 +1,9 @@
 Postscript interpreter - README
 ===============================
 
-Post V1.3 Copyright Adrian Aylward 1989, 1990
+Post V1.4 Copyright Adrian Aylward 1989, 1991
 
-This distribution was released as the archive file "post13.lzh", 27-Oct-90
+This distribution was released as the archive file "post13.lzh", ??-???-90
 
 Files in this distribution:
 
@@ -38,14 +38,14 @@ conman            ConMan, V1.3+
 You should find these on "All Good BBS's/disk libraries"
 
 I have tested Post under WorkBench V1.3 only.  If you have 2.0 it should
-work, but you may need a more recent version of ConMan.
+work, but you may need a more recent version of ConMan.  You may also need
+to use the CONDEV option to use ConMan instead of the standard console
+handler.
 
 You will need at least a megabyte of memory.  Even with a megabyte you
 will have not be able to generate a full page in colour on the screen.
 For high density printer output (A4 at 300 dpi.) you will need 2 megabytes!  If memory is very tight, try running from the CLI, before workbench has
-been loaded.  N.B. the default memory size has increased from earlier
-versions, so if you have a small machine you will have to do a little
-more shoehorning.
+been loaded.
 
 Before using Post you will need to copy the library (post.library or
 post.library.2620) into your libs: directory.  If you have a 32 bit cpu
@@ -101,17 +101,17 @@ requestor window appear.  Click on "OK" and wait while Post executes the
 startup file, then you are ready to go.
 
 If it says that it can't get enough memory (if you have only 1 megabyte)
-try selecting "Black and White" on the requestor window, and reducing the
-amount of VM from 600000 to 200000-300000.
+try selecting "Black and White" on the requestor window, and selecting
+the "Close WBench" option.
 
 For a quick check of the graphics, pick File/Interactive on the menu.  Then
 type into the narrow window at the top:
 
     200 200 150 0 360 arc stroke
 
-The result should be a circle appearing in the lower window.  When you
-have finished playing, type "quit" or CTRL/backslash.  Then "Project/Quit"
-will return you to the CLI.
+The result should be a circle appearing in the lower window.  When you have
+finished playing, type "quit".  Then "Project/Quit" will return you to the
+CLI.
 
 If you don't have any fonts yet all text output will just print as big dots.
 (Read the section below on fonts).  Make a "PSFonts:" directory and copy all
@@ -121,7 +121,7 @@ should be the same as their PostScript names - e.g. "PSFonts:Times-Roman",
 "PSFonts:Times-Bold".  The files can either be ASCII text or in IBM
 PostScript font format.  If you have copied them from an IBM disk you will
 have to change the names; since MSDOS can only handle 8 character names its
-stores Times-Roman as "TI______.AFB" and Times-Bold as "TIB_____.AFB".  Then
+stores Times-Roman as "TI______.PFB" and Times-Bold as "TIB_____.PFB".  Then
 Post will load the fonts automatically as they are needed.
 
 To use the workbench startup click on the icon.  You will probably want to
@@ -165,12 +165,17 @@ There are a number of commercial sources for fonts.  Both the Adobe type 1
 Since type 1 fonts can contain special "hints" to improve the quality at
 small point sizes on low or medium resolution devices they usually give
 much higher quality results.  You can get type 1 fonts from Adobe, or a
-number of other vendors.  A good source of the standard set of 35 fonts
-as come on most PostScript printers is the Adobe Type Manager (13 fonts)
-and its associated Plus Pack (22 fonts).  The Mac version contains the
-fonts, which can be converted to standard ASCII format by a utility
-program.  The IBM version will presumably contain the fonts too.  Post can
-read IBM format fonts directly, without converting the files.
+number of other vendors.
+
+A good source of the standard set of 35 fonts as come on most PostScript
+printers is the Adobe Type Manager (13 fonts) and its associated Plus Pack
+(22 fonts).  The IBM version contains the fonts in a format which can be read
+by Post.  Various utility programs (e.g. CROSSDOS) are available to copy file
+from IBM 3.5 inch disks onto Amiga files.  Just copy the .PFB files into your
+PSFonts: directory, changing the names to their PostScript names. The Mac
+version contains the fonts too, but you need a utility program to change the
+file format.  The quality of the Adobe fonts is excellent; the printed
+output from Post on my LJIIP rivals that of a LaserWriter.
 
 If you have any of the additional CompuGraphic outline fonts supplied by
 Gold Disk for use with their DTP programs you can generate type 3 fonts
@@ -205,3 +210,146 @@ Each font should have a FontName entry.  This isn't actually required by
 Adobe, but certain programs such as Adobe Illustrator copy the font directory
 when recoding the font.  If the name is missing, you get a dictionary full
 error after the name has been added.
+
+WorkBench 2.0
+=============
+
+I don't have 2.0 myself, so I am not able to test Post under it.  But I
+understand that it works OK.  You need to set up ConMan it you want to
+run interactively.  It you mount it as "CNC:" the you can use the CONDEV
+option to access it.  Otherwise you will find the console output is going
+to the WorkBench screen.
+
+Common problems
+===============
+
+Printers
+--------
+
+Some people have difficulty in getting Post to work correctly with printer
+output.  The first thing to check is that you have your printer preferences
+set up properly.  Post uses the printer values to set the size and density
+of its page buffer, so if you have silly values set it may pick a silly
+value for its buffer size and fail due to running out of memory.  So Run
+Preferences, go to the graphic 2 screen, and check the page limits.  If you
+set the limits to "Absolute" then width and height should be in inches; if
+you choose "Pixels" then the dimensions are in dots.  Turn smoothing and
+centering off.  On the graphic 1 screen, set the Aspect to horizontal, the
+image to positive, and the shade to black and white or colour according to
+your printer.  If the output comes out distorted, to a silly scale, or with
+circles turned into ellipses, and takes forether to print, it is probably
+because the page size is wrong and the printer device is laboriously scaling
+it to fit.
+
+If you are having problems with the printer setup, it is better to run Post
+interactively.  Then you can look at the values in the page size gadgets
+in the requestor window to check they are all sensible.
+
+Most page printers (lasers, DeskJet) will give the best quality with density
+set to the highest value.  For matrix printers try both the highest and the
+next highest - as the pins usually overlap at high densities the quality may
+not be any better.  If you are very tight on memory then a lower density
+will reduce the amount needed for the page buffer.
+
+The Workbench printer drivers print bitmapped graphics dumps within the
+text margins, whereas PostScript expects it bitmaps to begin right at the
+edges of the paper.  You can line things up properly by setting the page
+offset gadgets in the requestor window.  Once you have experimented to
+determine the proper values to can put them in a shell script, or set them
+in the WorkBench icon, so you don't have to type them every time.
+
+If you have a LaserJet printer or one that emulates it, you should use the
+special driver "postlj".  It is faster, supports all the paper sizes in
+both posrtrait and landscape orientation, and avoids all the problems with
+the standard Workbench drivers interface.  I have tested it on my HP LJIIP,
+but it should work on other LaserJet compatibles.
+
+Fonts
+-----
+
+Most of the remaining troubles relate to fonts.  I personally recommend
+the Adobe fonts: the quality is excellent and you are assured of maximum
+compatability.  There are many other sources for fonts.  Even the shareware
+fonts normally work.  However being constructed slightly differently from the
+Adobe ones, they sometimes fail when programs attempt to modify them to
+change the character set encoding or character widths or obtain special
+effects.
+
+Other troubles with fonts usually relate to not not being able to find the
+font file on the disk.  Read the comments in the init.ps file to see
+what directories in you filing system it is searching, also check whether
+you font files have extensions.  I prefer to keep my fonts without
+extensions, so for example on my machine "Times-Roman" is in the file
+"PSFonts:Times-Roman".  But you may want to keep the ".PFB" extension on
+your font filesif they are in IBM format - if you have other packages that
+like them that way.  You can easily change this by editing init.ps.
+
+N.B. if you have some files with ".AFM" extensions they are NOT PostScript
+fonts.  The are font metric files that define the character widths and other
+data for use by application programs; they do not define the characters
+outlines themselves.  Ther are of no use to Post.
+
+Use with other packages
+-----------------------
+
+I have used Post extensively with PPage (V1.3).  Early versions of PPage
+had a bug in the PostScript prologue that caused a limitcheck error when
+doping patterened fills, but this has been fixed for a while now.  I find
+that printing using postlj is about five times faster than printing direct
+from PPage.  It solves the page offset problem.  Also, it gives access to
+the Adobe type 1 font range, which is considerably more extensive than the
+hinted versions of the Compugraphic fonts that are presently available.
+
+I have tested a PageStream file.  There was a problem with the prologue
+not being compatable with downloaded Adobe fonts.  If you load all your
+fonts beforehand, using the "Load font" menu selection, it should work OK.
+Hopefully this will eb fixed soon.
+
+I have printed Excellence! files successfully.
+
+AmigaTeX with the PostScript driver should work OK.  I have seen a TeX
+example (from another system) that failed - it was trying to define a font
+with an encoding vector only 128 entries long.  If you meet this problem
+you can fix it if you are prepared to edit the PostScript file.
+vector only 128 entries long.
+
+Debugging
+---------
+
+If your PostScript program is failing, if you know a little PostScript
+is usually quit easy to find out what is going wrong.  In fact if you are
+developing PostScript code Post is a much better debugging tool than your
+average PostScript printer.
+
+It is normally best to use interactive mode for debugging.  Start up Post
+on the screen and pick the "interactive" option.  Then run you program
+from the interactive window.
+
+To run your program, type:
+
+    > (filename.ps) run
+
+If it fails with an error message, you can then type interactive commands
+to see what happened.
+
+To display the contents of the operand stack, type:
+
+    > pstack
+
+To display the contents of the execution stack at the point of the last
+error, type:
+
+    > $error /estack get ==
+
+To display the contents of any named variable, type:
+
+    > varname ==
+
+To see what is in the current dictionary, type:
+
+    > currentdict {== ==} forall
+
+If you have no idea how far your program got before it failed, try adding a
+few lines "1001 ==" "1002 ==" "1003 ==" to trace how far it got.  As
+PostScript files are pure ASCII text they are easy to inspect any modify
+with any editor.

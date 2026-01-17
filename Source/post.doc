@@ -1,7 +1,7 @@
 Postscript interpreter - user documentation
 ===========================================
 
-Post V1.3 Copyright Adrian Aylward 1989, 1990
+Post V1.4 Copyright Adrian Aylward 1989, 1991
 
 Free use and non-commercial reproduction of the binaries of the interpreter
 library (post.library) is permitted, providing that the copyright notices
@@ -62,7 +62,7 @@ The input files
 The interpreter reads the input files in turn.  When running interactively
 the input files are treated as startup files, and are rerun whenever the
 interpreter is restarted.  So you would normally specify just the standard
-startup file "init.ps", or an alternative of you own.  When running
+startup file "init.ps", or an alternative of your own.  When running
 non-interactively you should in addition specify all the files you want to
 interpret, up to 5 in total; when the last is finished the interpreter will
 exit.
@@ -128,10 +128,10 @@ Up to 5 SIZE options are allowed; later values override earlier ones.
 
 The page sizes ("x..y..s..") are in pixels, as decimal numbers; "s" sets
 the size of the bands, for band rendering to the printer.  The page offsets
-are in pixels, shifting the location of the bottom left of the bitmap
-relative to the PostScript logical page (origin at (0,0) in the initial user
-space). Densities ([x]d..[y]d..) are in pixels per inch; "xd" or "yd" set
-the x or y density, and "d" sets both.
+(xo..yo..) are in pixels, shifting the location of the bottom left of the
+bitmap relative to the PostScript logical page (origin at (0,0) in the
+initial user space). Densities ([x]d..[y]d..) are in pixels per inch; "xd"
+or "yd" set the x or y density, and "d" sets both.
 
 The printer density can be set by "p"; its value should be in the range 
 1 to 7.
@@ -148,23 +148,42 @@ The MEM option controls the amount of memory allocated for workspace.
 
 Up to 5 MEM options are allowed; later values override earlier ones.
 
-The memory defaults are chosen to suit a large machine processing relatively
-complex pages.  For simple screen output much lower minimums are possible -
-if you don't have enough memory on your machine try the small values
-instead.
+    Default  Minimum
+    -------  -------
+     f60000     1000     Font cache
+     h20000     1000     Halftone cache
+     v50000     5000     Virtual machine memory segment size
+     l10000     1000     Line drawing workspace segment size
 
-    Default   Small
-    -------   -----
-    v600000  (80000)     Virtual machine memory
-     f60000   (1000)     Font cache
-     l60000   (8000)     Line drawing and image workspace
-     h20000   (1000)     Halftone buffer
+In addition memory is allocated for the page buffer (one bit per pixel)
+and for drawing and imaging buffers.
 
-     (x+64) * (y+16) / 8 Page buffer
+Since most of the workspace is allocated automatically you will not usually
+need to adjust these options.  If your program is so large that you do need
+to increase any of these values, be aware that it is unlikely that it will
+run on any standard PostScript printer.
 
-The default values should run on a 1.5MB machine with output to the screen
-On a 2MB machine it should be possible to generate a complex A4 page of
-printer output at 300 dpi.
+The font cache is used to store character bitmaps; it saves recalculating
+them each time they are needed, so text rendering becomes many times faster.
+The default value is reasonable for average sized machines; if you are
+trying to shoehorn things into a small machine you could try reducing it. Or
+if you are printing a document using a large number of different characters,
+fonts, and sizes you may be able to imrove performance by increasing it.
+
+The halftone cache holds halftone patterns used for simulating gray values.
+The default value will normally be satisfactory, but you might possibly need
+to increase it if you are using very large halftone patterns, for example
+for complex patterned fills.
+
+The virtual machine memory is automatically allocated in segments as they
+are needed, up to a maximum of 63.  For most purposes you will not need
+to alter the segment size, but if you are running a gigantic program you
+might possibly need to increase it.
+
+The line drawing workspace holds the current path, together with all the
+paths saved by a gsave operation.  It is automatically allocated in
+segments, up to a maximum of twenty.  The default size is sufficient for
+about 4000 path elements, enough for all normal programs.
 
 The CLOSEWB option
 ------------------
@@ -272,7 +291,14 @@ control character.
 Error handling
 --------------
 
-A new error "invalidstop" has been added.
+All the standard Adobe error conditions are supported.  There also some
+additional errors:
+
+The error "invalidstop" will be generated if a "stop" operator is executed
+not within any encolsing "stopped" context.
+
+The error "memoryallocation" will be executed if the interpreter is unable
+to obtain sufficient memory from the operating system.
 
 The execution stack
 -------------------
@@ -329,7 +355,9 @@ operator to calculate the number of bands needed:
 will execute "pageproc" once for each band (remaining) on the page.  The
 procedure should execute copypage (or showpage) exactly once per iteration.
 
-N.B. this technique is only suitable for printer output.
+This technique is only suitable for printer output.  There is a special
+driver program "postband" that handles this automatically for programs
+that conform to the Adobe structuring conventions.
 
 Fonts
 -----
@@ -484,6 +512,26 @@ Returns two integers: the high water mark of the amount virtual memory used
 since the program was first started or the last "vmhwm", and the maximum
 available amount of memory.
 
+    callextfunc
+
+        result arg1 arg2 ... argc func "callextfunc" result
+
+Calls an external function using a C calling sequence.  This operator is not
+available for use by ordinary PostScript programs; it can only be used when
+the library is called with an external function table supplied as an argument
+(see the library interface documentation for details).  The "func" argument
+is the index of the function in the external call table, and "argc" is the
+number of parameters; both must be non-negative integers.  The result is
+the object in which the result will be placed.  If it a null then no result
+will be returned and the null object will be discarded; otherwise it must
+match the type of the result returned from the function.  For both result and
+parameters bool and integer types will work OK; real types will work if your
+C compiler passes them just like ints (use ANSI prototypes so it does not
+expand them to double).  For string parameters the address is passed.  Arrays
+may be passed as parameters, but they are only useful if you know their
+PostScript object representation.  The maximum number of parameters
+permitted is 20.
+
 Miscellaneous
 -------------
 
@@ -495,7 +543,7 @@ without using definefont.
 Device space
 ------------
 
-The largest device that the interpreter can handle is 31767 (sic) by 32767
+The largest device that the interpreter can handle is 30000 by 30000
 pixels.  In practice you will probably run out of memory long before
 reaching this limit.
 
@@ -607,3 +655,14 @@ characters in error message command names, hints with stems of negative
 width, font character cache sizing, tune baseline alignment and flex,
 eexec lines ending in CR (not CRLF), aload packed arrays, zero length
 charstrings, font character cache hash chains.
+
+    V1.4  ??-???-??
+
+External function call interface added.  New flexible memory allocation for
+vm and paths; new error "memoryallocation".  More flexible font cache limit.
+
+Interface fixes: Memory Fonts/Paths gadgets transposed, drag scroll bars
+under 2.0.
+
+Bugs fixed: writehexstring, zero height clipped paths, $error in userdict,
+undocumented charstring codes, halftone cacheing, mixed type 1 and 3 fonts.
